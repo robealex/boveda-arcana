@@ -20,6 +20,31 @@ model Inventory {
   rarity     String?
   typeLine   String?  @map("type_line")
   createdAt  DateTime @default(now()) @map("created_at")
+  orderItems OrderItem[]
 
   @@map("inventory")
+}
+
+model Order {
+  id        Int         @id @default(autoincrement())
+  status    String      @default("pending") // pending | confirmed | cancelled
+  expiresAt DateTime    @map("expires_at")
+  totalUsd  Decimal     @map("total_usd")
+  createdAt DateTime    @default(now()) @map("created_at")
+  items     OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id          Int       @id @default(autoincrement())
+  order       Order     @relation(fields: [orderId], references: [id])
+  orderId     Int       @map("order_id")
+  inventory   Inventory @relation(fields: [inventoryId], references: [id])
+  inventoryId Int       @map("inventory_id")
+  name        String
+  qty         Int
+  priceUsd    Decimal   @map("price_usd")
+
+  @@map("order_items")
 }

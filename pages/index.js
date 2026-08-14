@@ -72,7 +72,7 @@ export default function Home() {
   async function checkoutWhatsapp() {
     if (!WA_NUMBER) { alert('El vendedor todavía no configuró su número de WhatsApp (NEXT_PUBLIC_WHATSAPP_NUMBER).'); return; }
     try {
-      const r = await fetch('/api/reserve', {
+      const r = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: cart.map(c => ({ id: c.id, qty: c.qty })) })
@@ -194,7 +194,7 @@ export default function Home() {
               </a>
             )}
             <button className="primary" style={{ width: '100%' }} onClick={checkoutWhatsapp}>Enviar pedido por WhatsApp</button>
-            <p className="hint" style={{ marginTop: 8 }}>Al enviar, apartamos estas cartas para ti automáticamente.</p>
+            <p className="hint" style={{ marginTop: 8 }}>Al enviar, apartamos estas cartas por 48 horas mientras confirmamos tu pedido.</p>
             <button className="ghost" style={{ width: '100%', marginTop: 8 }} onClick={() => setCartOpen(false)}>Cerrar</button>
           </div>
         </>

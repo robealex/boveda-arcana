@@ -79,7 +79,7 @@ export default function Admin() {
   async function editItem(it) {
     const price = prompt(`Nuevo precio en USD para "${it.name}":`, Number(it.price).toFixed(2));
     if (price === null) return;
-    const qty = prompt('Nueva cantidad disponible:', it.qty);
+    const qty = prompt('Nueva cantidad TOTAL en tu posesión (sin restar apartados):', it.rawQty);
     if (qty === null) return;
     const condition = prompt('Nueva condición:', it.condition || 'Near Mint');
     if (condition === null) return;
@@ -91,6 +91,42 @@ export default function Admin() {
     });
     if (!r.ok) { const d = await r.json(); alert(d.error || 'Error al actualizar'); return; }
     loadInventory();
+  }
+
+  // ---------- Pedidos ----------
+  const [view, setView] = useState('inventory');
+  const [orders, setOrders] = useState([]);
+
+  function loadOrders() {
+    fetch('/api/orders', { headers: { 'x-admin-password': pw } }).then(r => r.json()).then(d => setOrders(d.orders || []));
+  }
+
+  useEffect(() => { if (authed && view === 'orders') loadOrders(); }, [authed, view]);
+
+  function orderDisplayStatus(o) {
+    if (o.status === 'pending' && new Date(o.expiresAt) < new Date()) return 'Vencido';
+    if (o.status === 'pending') return 'Pendiente';
+    if (o.status === 'confirmed') return 'Confirmado';
+    return 'Cancelado';
+  }
+
+  async function setOrderStatus(id, status) {
+    const r = await fetch(`/api/orders?id=${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
+      body: JSON.stringify({ status })
+    });
+    if (!r.ok) { const d = await r.json(); alert(d.error || 'Error al actualizar el pedido'); return; }
+    loadOrders();
+    if (status === 'confirmed') loadInventory();
+  }
+
+  function timeLeft(expiresAt) {
+    const ms = new Date(expiresAt) - new Date();
+    if (ms <= 0) return 'vencido';
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    return `${h}h ${m}m restantes`;
   }
 
   if (!authed) {
@@ -108,8 +144,15 @@ export default function Admin() {
 
   return (
     <main>
-      <h2>Administrar inventario</h2>
+      <h2>Panel de administrador</h2>
 
+      <div className="tabs" style={{ justifyContent: 'flex-start', marginBottom: 28 }}>
+        <button className={`tab-btn ${view === 'inventory' ? 'active' : ''}`} onClick={() => setView('inventory')}>Inventario</button>
+        <button className={`tab-btn ${view === 'orders' ? 'active' : ''}`} onClick={() => setView('orders')}>Pedidos</button>
+      </div>
+
+      {view === 'inventory' && (
+      <>
       <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
         <input placeholder="Buscar carta en Scryfall (ej. Sol Ring)" value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} />
         <button className="primary" onClick={search} disabled={searching}>{searching ? 'Buscando...' : 'Buscar'}</button>
@@ -145,7 +188,9 @@ export default function Admin() {
             <div className="art">{it.img && <img src={it.img} alt={it.name} />}</div>
             <div className="info">
               <div className="name">{it.name}</div>
-              <div className="set">{it.condition} · x{it.qty}</div>
+              <div className="set">
+                {it.condition} · x{it.rawQty}{it.reserved > 0 ? ` (${it.reserved} apartadas, ${it.qty} libres)` : ''}
+              </div>
               <div className="price mono">${Number(it.price).toFixed(2)} USD{rate ? ` · ≈$${(Number(it.price) * rate).toFixed(2)} MXN` : ''}</div>
               <div className="row" style={{ display: 'flex', gap: 8 }}>
                 <button className="ghost" style={{ flex: 1 }} onClick={() => editItem(it)}>Editar</button>
@@ -155,6 +200,46 @@ export default function Admin() {
           </div>
         ))}
       </div>
+      </>
+      )}
+
+      {view === 'orders' && (
+        <div>
+          <h3 style={{ marginTop: 8 }}>Pedidos ({orders.length})</h3>
+          {orders.length === 0 && <p className="hint">Todavía no hay pedidos.</p>}
+          {orders.map(o => {
+            const st = orderDisplayStatus(o);
+            const badgeColor = st === 'Pendiente' ? 'var(--gold)' : st === 'Confirmado' ? 'var(--teal)' : st === 'Vencido' ? 'var(--blood)' : 'var(--muted)';
+            return (
+              <div key={o.id} style={{ background: 'var(--ink2)', border: '1px solid var(--line)', borderRadius: 10, padding: 16, marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                  <div>
+                    <span style={{ color: badgeColor, fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{st}</span>
+                    <span className="hint" style={{ marginLeft: 10 }}>Pedido #{o.id} · {new Date(o.createdAt).toLocaleString('es-MX')}</span>
+                  </div>
+                  {o.status === 'pending' && st !== 'Vencido' && (
+                    <span className="hint">{timeLeft(o.expiresAt)}</span>
+                  )}
+                </div>
+                <ul style={{ margin: '10px 0', paddingLeft: 18 }}>
+                  {o.items.map(it => (
+                    <li key={it.id} className="hint" style={{ color: 'var(--parchment)' }}>
+                      {it.name} x{it.qty} — ${Number(it.priceUsd).toFixed(2)} USD c/u
+                    </li>
+                  ))}
+                </ul>
+                <div className="mono" style={{ color: 'var(--gold)', marginBottom: 10 }}>Total: ${Number(o.totalUsd).toFixed(2)} USD</div>
+                {(o.status === 'pending') && (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="primary" onClick={() => setOrderStatus(o.id, 'confirmed')}>Confirmar venta</button>
+                    <button className="ghost" onClick={() => setOrderStatus(o.id, 'cancelled')}>Cancelar</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </main>
   );
 }

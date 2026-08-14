@@ -1,14 +1,33 @@
 import { prisma } from '../../lib/prisma';
 import { checkAdmin } from '../../lib/auth';
 
-function serialize(item) {
-  return { ...item, price: Number(item.price) };
+function serialize(item, reservedMap) {
+  const reserved = reservedMap?.get(item.id) || 0;
+  return {
+    ...item,
+    price: Number(item.price),
+    rawQty: item.qty,
+    reserved,
+    qty: Math.max(0, item.qty - reserved)
+  };
+}
+
+async function getReservedMap() {
+  const rows = await prisma.orderItem.groupBy({
+    by: ['inventoryId'],
+    where: { order: { status: 'pending', expiresAt: { gt: new Date() } } },
+    _sum: { qty: true }
+  });
+  return new Map(rows.map(r => [r.inventoryId, r._sum.qty || 0]));
 }
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
-    const items = await prisma.inventory.findMany({ orderBy: { createdAt: 'desc' } });
-    return res.status(200).json({ items: items.map(serialize) });
+    const [items, reservedMap] = await Promise.all([
+      prisma.inventory.findMany({ orderBy: { createdAt: 'desc' } }),
+      getReservedMap()
+    ]);
+    return res.status(200).json({ items: items.map(it => serialize(it, reservedMap)) });
   }
 
   if (req.method === 'POST') {
@@ -36,7 +55,11 @@ export default async function handler(req, res) {
     if (!checkAdmin(req)) return res.status(401).json({ error: 'Password de administrador incorrecto' });
     const { id } = req.query;
     if (!id) return res.status(400).json({ error: 'Falta id' });
-    await prisma.inventory.delete({ where: { id: parseInt(id) } });
+    try {
+      await prisma.inventory.delete({ where: { id: parseInt(id) } });
+    } catch (e) {
+      return res.status(400).json({ error: 'No se puede eliminar: esta carta tiene pedidos asociados en el historial. Cancélalos o confírmalos primero desde la pestaña Pedidos.' });
+    }
     return res.status(200).json({ ok: true });
   }
 
