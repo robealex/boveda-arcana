@@ -12,7 +12,7 @@ export default async function handler(req, res) {
       return res.status(r.status).json({ error: 'Scryfall no encontró resultados', data: [] });
     }
     const data = await r.json();
-    const simplified = (data.data || []).slice(0, 12).map((c) => ({
+    const simplified = (data.data || []).slice(0, 60).map((c) => ({
       name: c.name,
       set_name: c.set_name,
       img: c.image_uris?.normal || c.card_faces?.[0]?.image_uris?.normal || '',

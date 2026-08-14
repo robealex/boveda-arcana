@@ -31,8 +31,9 @@ export default function Home() {
     .filter(it => {
       if (colorFilter.length === 0) return true;
       const cardColors = (it.colors || '').split(',').filter(Boolean);
-      if (colorFilter.includes('C') && cardColors.length === 0) return true;
-      return cardColors.some(c => colorFilter.includes(c));
+      const effective = cardColors.length ? [...cardColors].sort() : ['C'];
+      const wanted = [...colorFilter].sort();
+      return effective.length === wanted.length && effective.every((c, i) => c === wanted[i]);
     })
     .filter(it => !rarityFilter || it.rarity === rarityFilter)
     .filter(it => !typeFilter || (it.typeLine || '').includes(typeFilter))
@@ -128,7 +129,7 @@ export default function Home() {
           </select>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
           {Object.entries(COLOR_INFO).map(([code, label]) => (
             <button
               key={code}
@@ -141,8 +142,12 @@ export default function Home() {
               }}
             >{label}</button>
           ))}
+          <button className="ghost" onClick={() => setColorFilter(['W', 'U', 'B', 'R', 'G'])}>Penta (5 colores)</button>
           {colorFilter.length > 0 && <button className="ghost" onClick={() => setColorFilter([])}>Limpiar colores</button>}
         </div>
+        <p className="hint" style={{ marginTop: -2, marginBottom: 24 }}>
+          {colorFilter.length > 0 ? 'Mostrando solo cartas con exactamente estos colores (no combinaciones que solo los incluyan).' : ''}
+        </p>
 
         {items.length === 0 && <p className="hint">Todavía no hay cartas publicadas.</p>}
 

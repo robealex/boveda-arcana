@@ -11,6 +11,45 @@ export default function Admin() {
   const [rate, setRate] = useState(null);
   const [sortBy, setSortBy] = useState('newest');
 
+  // ---------- Búsqueda avanzada ----------
+  const [showExact, setShowExact] = useState(false);
+  const [exName, setExName] = useState('');
+  const [exCmc, setExCmc] = useState('');
+  const [exSet, setExSet] = useState('');
+  const [exYear, setExYear] = useState('');
+  const [exRarity, setExRarity] = useState('');
+  const [exType, setExType] = useState('');
+  const [exColors, setExColors] = useState([]);
+  const COLOR_CODES = { W: 'Blanco', U: 'Azul', B: 'Negro', R: 'Rojo', G: 'Verde' };
+
+  function toggleExColor(c) {
+    setExColors(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
+  }
+
+  function buildExactQuery() {
+    const parts = [];
+    if (exName.trim()) parts.push(exName.trim());
+    if (exCmc !== '') parts.push(`cmc=${exCmc}`);
+    if (exSet.trim()) parts.push(`set:${exSet.trim()}`);
+    if (exYear.trim()) parts.push(`year:${exYear.trim()}`);
+    if (exRarity) parts.push(`rarity:${exRarity}`);
+    if (exType.trim()) parts.push(`type:${exType.trim()}`);
+    if (exColors.length > 0) parts.push(`color=${exColors.join('').toLowerCase()}`);
+    return parts.join(' ');
+  }
+
+  async function searchExact() {
+    const built = buildExactQuery();
+    if (!built.trim()) { setError('Llena al menos un campo para buscar.'); return; }
+    await runSearch(built);
+  }
+
+  // ---------- Paginación de resultados ----------
+  const RESULTS_PER_PAGE = 8;
+  const [resultsPage, setResultsPage] = useState(0);
+  const totalResultPages = Math.max(1, Math.ceil(results.length / RESULTS_PER_PAGE));
+  const pagedResults = results.slice(resultsPage * RESULTS_PER_PAGE, resultsPage * RESULTS_PER_PAGE + RESULTS_PER_PAGE);
+
   const sortedItems = [...items].sort((a, b) => {
     if (sortBy === 'name') return a.name.localeCompare(b.name);
     if (sortBy === 'price_asc') return Number(a.price) - Number(b.price);
@@ -38,16 +77,20 @@ export default function Admin() {
     setAuthed(true);
   }
 
-  async function search() {
-    if (!q.trim()) return;
-    setSearching(true); setError('');
+  async function runSearch(query) {
+    setSearching(true); setError(''); setResultsPage(0);
     try {
-      const r = await fetch('/api/search-cards?q=' + encodeURIComponent(q));
+      const r = await fetch('/api/search-cards?q=' + encodeURIComponent(query));
       const d = await r.json();
       if (!r.ok) { setError(d.error || 'Sin resultados'); setResults([]); }
       else setResults(d.data || []);
     } catch (e) { setError('Error al buscar'); }
     setSearching(false);
+  }
+
+  async function search() {
+    if (!q.trim()) return;
+    await runSearch(q);
   }
 
   async function addFromSearch(card) {
@@ -157,10 +200,72 @@ export default function Admin() {
         <input placeholder="Buscar carta en Scryfall (ej. Sol Ring)" value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} />
         <button className="primary" onClick={search} disabled={searching}>{searching ? 'Buscando...' : 'Buscar'}</button>
       </div>
+
+      <button className="ghost" style={{ marginBottom: 16 }} onClick={() => setShowExact(v => !v)}>
+        {showExact ? 'Ocultar búsqueda exacta ▲' : 'Búsqueda exacta ▼'}
+      </button>
+
+      {showExact && (
+        <div style={{ background: 'var(--ink2)', border: '1px solid var(--line)', borderRadius: 10, padding: 18, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px,1fr))', gap: 12, marginBottom: 12 }}>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Nombre (opcional)</label>
+              <input value={exName} onChange={e => setExName(e.target.value)} placeholder="ej. Rin and Seri" />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Costo de maná (CMC)</label>
+              <input type="number" value={exCmc} onChange={e => setExCmc(e.target.value)} placeholder="ej. 3" />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Edición (código, ej. znr)</label>
+              <input value={exSet} onChange={e => setExSet(e.target.value)} placeholder="ej. znr" />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Año</label>
+              <input type="number" value={exYear} onChange={e => setExYear(e.target.value)} placeholder="ej. 2020" />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Rareza</label>
+              <select value={exRarity} onChange={e => setExRarity(e.target.value)}>
+                <option value="">Cualquiera</option>
+                <option value="common">Common</option>
+                <option value="uncommon">Uncommon</option>
+                <option value="rare">Rare</option>
+                <option value="mythic">Mythic</option>
+              </select>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Tipo</label>
+              <input value={exType} onChange={e => setExType(e.target.value)} placeholder="ej. Creature" />
+            </div>
+          </div>
+
+          <label>Colores exactos</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6, marginBottom: 14 }}>
+            {Object.entries(COLOR_CODES).map(([code, label]) => (
+              <button
+                key={code}
+                className="ghost"
+                onClick={() => toggleExColor(code)}
+                style={{
+                  borderColor: exColors.includes(code) ? 'var(--gold)' : 'var(--line)',
+                  background: exColors.includes(code) ? 'rgba(201,162,39,0.12)' : 'transparent',
+                  color: exColors.includes(code) ? 'var(--gold)' : 'var(--parchment)'
+                }}
+              >{label}</button>
+            ))}
+            <button className="ghost" onClick={() => setExColors(['W', 'U', 'B', 'R', 'G'])}>Penta (5 colores)</button>
+            {exColors.length > 0 && <button className="ghost" onClick={() => setExColors([])}>Limpiar</button>}
+          </div>
+
+          <button className="primary" onClick={searchExact} disabled={searching}>{searching ? 'Buscando...' : 'Buscar exacto'}</button>
+        </div>
+      )}
+
       {error && <p className="hint">{error}</p>}
 
-      <div className="grid" style={{ marginBottom: 40 }}>
-        {results.map((c, i) => (
+      <div className="grid" style={{ marginBottom: 8 }}>
+        {pagedResults.map((c, i) => (
           <div className="card" key={i}>
             <div className="art">{c.img && <img src={c.img} alt={c.name} />}</div>
             <div className="info">
@@ -172,6 +277,26 @@ export default function Admin() {
           </div>
         ))}
       </div>
+
+      {results.length > RESULTS_PER_PAGE && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginBottom: 40 }}>
+          <button className="ghost" onClick={() => setResultsPage(p => Math.max(0, p - 1))} disabled={resultsPage === 0}>←</button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {Array.from({ length: totalResultPages }).map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setResultsPage(i)}
+                style={{
+                  width: 9, height: 9, borderRadius: '50%', border: 'none', cursor: 'pointer', padding: 0,
+                  background: i === resultsPage ? 'var(--gold)' : 'var(--line)'
+                }}
+              />
+            ))}
+          </div>
+          <button className="ghost" onClick={() => setResultsPage(p => Math.min(totalResultPages - 1, p + 1))} disabled={resultsPage === totalResultPages - 1}>→</button>
+        </div>
+      )}
+      {results.length <= RESULTS_PER_PAGE && <div style={{ marginBottom: 40 }} />}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
         <h3 style={{ margin: 0 }}>Inventario actual ({items.length})</h3>
