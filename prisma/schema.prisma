@@ -1,0 +1,22 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Inventory {
+  id         Int      @id @default(autoincrement())
+  name       String
+  setName    String?  @map("set_name")
+  img        String?
+  price      Decimal
+  qty        Int      @default(1)
+  condition  String?
+  stripeLink String?  @map("stripe_link")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("inventory")
+}
