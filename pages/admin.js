@@ -8,6 +8,11 @@ export default function Admin() {
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
+  const [rate, setRate] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/exchange-rate').then(r => r.json()).then(d => setRate(d.rate));
+  }, []);
 
   useEffect(() => {
     const saved = typeof window !== 'undefined' ? sessionStorage.getItem('admin_pw') : null;
@@ -38,7 +43,12 @@ export default function Admin() {
   }
 
   async function addFromSearch(card) {
-    const price = prompt(`Precio de venta en MXN para "${card.name}" (ref. Scryfall: $${card.usd || '?'} USD):`);
+    const usdNum = parseFloat(card.usd);
+    const suggested = rate && usdNum ? (usdNum * rate).toFixed(2) : '';
+    const refText = card.usd
+      ? `(ref. Scryfall: $${card.usd} USD${suggested ? ` ≈ $${suggested} MXN al tipo de cambio de hoy` : ''})`
+      : '(sin precio de referencia)';
+    const price = prompt(`Precio de venta en MXN para "${card.name}" ${refText}:`, suggested);
     if (!price || isNaN(parseFloat(price))) return;
     const qty = prompt('Cantidad disponible:', '1') || '1';
     const condition = prompt('Condición (Near Mint / Lightly Played / etc.):', 'Near Mint') || 'Near Mint';
@@ -92,7 +102,7 @@ export default function Admin() {
             <div className="info">
               <div className="name">{c.name}</div>
               <div className="set">{c.set_name}</div>
-              <div className="price mono">{c.usd ? `$${c.usd} USD ref.` : 'Sin precio ref.'}</div>
+              <div className="price mono">{c.usd ? `$${c.usd} USD ref.${rate ? ` · ≈$${(parseFloat(c.usd) * rate).toFixed(2)} MXN` : ''}` : 'Sin precio ref.'}</div>
               <button className="ghost" onClick={() => addFromSearch(c)}>Agregar a inventario</button>
             </div>
           </div>
