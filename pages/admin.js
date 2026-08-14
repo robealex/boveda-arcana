@@ -172,6 +172,119 @@ export default function Admin() {
     return `${h}h ${m}m restantes`;
   }
 
+  // ---------- Importar CSV ----------
+  const [showImport, setShowImport] = useState(false);
+  const [csvRows, setCsvRows] = useState([]);
+  const [importing, setImporting] = useState(false);
+
+  function parseCSV(text) {
+    const rows = [];
+    let i = 0, field = '', row = [], inQuotes = false;
+    while (i < text.length) {
+      const char = text[i];
+      if (inQuotes) {
+        if (char === '"') {
+          if (text[i + 1] === '"') { field += '"'; i++; } else { inQuotes = false; }
+        } else field += char;
+      } else {
+        if (char === '"') inQuotes = true;
+        else if (char === ',') { row.push(field); field = ''; }
+        else if (char === '\n' || char === '\r') {
+          if (char === '\r' && text[i + 1] === '\n') i++;
+          row.push(field); field = ''; rows.push(row); row = [];
+        } else field += char;
+      }
+      i++;
+    }
+    if (field !== '' || row.length) { row.push(field); rows.push(row); }
+    return rows.filter(r => r.length && r.some(c => c.trim() !== ''));
+  }
+
+  function handleCsvFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const rows = parseCSV(String(reader.result));
+      if (rows.length === 0) { alert('El CSV está vacío.'); return; }
+      const header = rows[0].map(c => c.trim().toLowerCase());
+      const nameIdx = header.findIndex(h => ['name', 'nombre', 'carta', 'card'].includes(h));
+      const qtyIdx = header.findIndex(h => ['qty', 'cantidad', 'cant'].includes(h));
+      const condIdx = header.findIndex(h => ['condition', 'condicion', 'condición', 'estado'].includes(h));
+      const dataRows = nameIdx !== -1 ? rows.slice(1) : rows;
+      const parsed = dataRows
+        .map(r => ({
+          name: (nameIdx !== -1 ? r[nameIdx] : r[0]) || '',
+          qty: (qtyIdx !== -1 && r[qtyIdx] && parseInt(r[qtyIdx])) || 1,
+          condition: (condIdx !== -1 && r[condIdx] && r[condIdx].trim()) || 'Near Mint',
+          status: 'pending', data: null, price: '', include: true
+        }))
+        .map(r => ({ ...r, name: r.name.trim() }))
+        .filter(r => r.name);
+      if (parsed.length === 0) { alert('No se encontraron nombres de cartas en el archivo.'); return; }
+      setCsvRows(parsed);
+      runImportLookups(parsed);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
+
+  async function runImportLookups(rowsToProcess) {
+    setImporting(true);
+    for (let i = 0; i < rowsToProcess.length; i++) {
+      setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'loading' } : r));
+      try {
+        const res = await fetch('/api/card-lookup?name=' + encodeURIComponent(rowsToProcess[i].name));
+        const d = await res.json();
+        if (!res.ok) setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'notfound' } : r));
+        else setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'found', data: d, price: d.usd || '' } : r));
+      } catch (e) {
+        setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'notfound' } : r));
+      }
+      await new Promise(res => setTimeout(res, 120));
+    }
+    setImporting(false);
+  }
+
+  function updateCsvRow(i, patch) {
+    setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
+  }
+
+  async function retryCsvRow(i) {
+    updateCsvRow(i, { status: 'loading' });
+    try {
+      const res = await fetch('/api/card-lookup?name=' + encodeURIComponent(csvRows[i].name));
+      const d = await res.json();
+      if (!res.ok) updateCsvRow(i, { status: 'notfound' });
+      else updateCsvRow(i, { status: 'found', data: d, price: d.usd || '' });
+    } catch (e) {
+      updateCsvRow(i, { status: 'notfound' });
+    }
+  }
+
+  async function importSelected() {
+    const toAdd = csvRows
+      .map((r, i) => ({ ...r, i }))
+      .filter(r => r.include && r.status === 'found' && r.price !== '' && !isNaN(parseFloat(r.price)));
+    if (toAdd.length === 0) { alert('No hay cartas listas para agregar (revisa que tengan precio y estén marcadas).'); return; }
+    setImporting(true);
+    for (const r of toAdd) {
+      await fetch('/api/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
+        body: JSON.stringify({
+          name: r.data.name, set_name: r.data.set_name, img: r.data.img,
+          price: parseFloat(r.price), qty: r.qty, condition: r.condition,
+          colors: r.data.colors, rarity: r.data.rarity, type_line: r.data.type_line
+        })
+      });
+    }
+    setImporting(false);
+    setCsvRows([]);
+    loadInventory();
+    alert(`Se agregaron ${toAdd.length} cartas al inventario.`);
+  }
+
   if (!authed) {
     return (
       <main style={{ maxWidth: 360, marginTop: 100 }}>
@@ -196,6 +309,69 @@ export default function Admin() {
 
       {view === 'inventory' && (
       <>
+      <button className="ghost" style={{ marginBottom: 16, marginRight: 8 }} onClick={() => setShowImport(v => !v)}>
+        {showImport ? 'Ocultar importar CSV ▲' : 'Importar CSV ▼'}
+      </button>
+
+      {showImport && (
+        <div style={{ background: 'var(--ink2)', border: '1px solid var(--line)', borderRadius: 10, padding: 18, marginBottom: 24 }}>
+          <p className="hint" style={{ marginTop: 0 }}>
+            Sube un CSV con una columna <code>name</code> (o solo los nombres en la primera columna, uno por fila).
+            Columnas opcionales: <code>qty</code> y <code>condition</code>. Por cada nombre buscamos el precio y los
+            datos en Scryfall automáticamente — tú solo revisas y confirmas.
+          </p>
+          <input type="file" accept=".csv,text/csv" onChange={handleCsvFile} disabled={importing} />
+
+          {csvRows.length > 0 && (
+            <div style={{ marginTop: 18 }}>
+              {csvRows.map((r, i) => (
+                <div key={i} className="cart-item" style={{ alignItems: 'flex-start' }}>
+                  {r.data?.img && <img src={r.data.img} alt={r.name} />}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      {r.status === 'found' && (
+                        <input type="checkbox" checked={r.include} onChange={e => updateCsvRow(i, { include: e.target.checked })} />
+                      )}
+                      <strong style={{ fontSize: '0.9rem' }}>{r.data?.name || r.name}</strong>
+                      {r.status === 'loading' && <span className="hint">buscando...</span>}
+                      {r.status === 'notfound' && <span style={{ color: 'var(--blood)', fontSize: '0.8rem' }}>no encontrada</span>}
+                      {r.status === 'found' && <span className="hint">{r.data.set_name}</span>}
+                    </div>
+
+                    {r.status === 'notfound' && (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                        <input value={r.name} onChange={e => updateCsvRow(i, { name: e.target.value })} style={{ maxWidth: 220 }} />
+                        <button className="ghost" onClick={() => retryCsvRow(i)}>Reintentar</button>
+                      </div>
+                    )}
+
+                    {r.status === 'found' && (
+                      <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span className="hint">Precio USD:</span>
+                        <input type="number" value={r.price} onChange={e => updateCsvRow(i, { price: e.target.value })} style={{ width: 90 }} />
+                        <span className="hint">Cant.:</span>
+                        <input type="number" value={r.qty} onChange={e => updateCsvRow(i, { qty: parseInt(e.target.value) || 1 })} style={{ width: 60 }} />
+                        <select value={r.condition} onChange={e => updateCsvRow(i, { condition: e.target.value })} style={{ width: 160 }}>
+                          <option>Near Mint</option><option>Lightly Played</option><option>Moderately Played</option><option>Heavily Played</option><option>Damaged</option>
+                        </select>
+                        {r.data.usd && <span className="hint">(ref. Scryfall: ${r.data.usd} USD)</span>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 16, alignItems: 'center' }}>
+                <button className="primary" onClick={importSelected} disabled={importing}>
+                  {importing ? 'Procesando...' : `Agregar seleccionadas (${csvRows.filter(r => r.include && r.status === 'found').length})`}
+                </button>
+                <button className="ghost" onClick={() => setCsvRows([])} disabled={importing}>Cancelar importación</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
         <input placeholder="Buscar carta en Scryfall (ej. Sol Ring)" value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} />
         <button className="primary" onClick={search} disabled={searching}>{searching ? 'Buscando...' : 'Buscar'}</button>
