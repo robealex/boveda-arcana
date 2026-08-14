@@ -8,12 +8,19 @@ export default function Home() {
   const [filter, setFilter] = useState('');
   const [cart, setCart] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
+  const [rate, setRate] = useState(null);
 
   useEffect(() => {
     fetch('/api/inventory').then(r => r.json()).then(d => setItems(d.items || []));
+    fetch('/api/exchange-rate').then(r => r.json()).then(d => setRate(d.rate));
   }, []);
 
   const visible = items.filter(it => it.qty > 0 && it.name.toLowerCase().includes(filter.toLowerCase()));
+
+  function mxn(usdPrice) {
+    if (!rate) return null;
+    return usdPrice * rate;
+  }
 
   function addToCart(it) {
     setCart(prev => {
@@ -22,7 +29,7 @@ export default function Home() {
         if (existing.qty < it.qty) return prev.map(c => c.id === it.id ? { ...c, qty: c.qty + 1 } : c);
         return prev;
       }
-      return [...prev, { id: it.id, name: it.name, price: Number(it.price), img: it.img, qty: 1, max: it.qty, stripe_link: it.stripe_link }];
+      return [...prev, { id: it.id, name: it.name, priceUsd: Number(it.price), img: it.img, qty: 1, max: it.qty, stripe_link: it.stripe_link }];
     });
     setCartOpen(true);
   }
@@ -33,12 +40,16 @@ export default function Home() {
       .filter(c => c.qty > 0));
   }
 
-  const total = cart.reduce((s, c) => s + c.price * c.qty, 0);
+  const totalUsd = cart.reduce((s, c) => s + c.priceUsd * c.qty, 0);
+  const totalMxn = mxn(totalUsd);
 
   function checkoutWhatsapp() {
     if (!WA_NUMBER) { alert('El vendedor todavía no configuró su número de WhatsApp (NEXT_PUBLIC_WHATSAPP_NUMBER).'); return; }
-    const lines = cart.map(c => `• ${c.name} x${c.qty} — $${(c.price * c.qty).toFixed(2)} MXN`).join('%0A');
-    const msg = `Hola! Quiero comprar estas cartas de Bóveda Arcana:%0A${lines}%0A%0ATotal: $${total.toFixed(2)} MXN`;
+    const lines = cart.map(c => {
+      const lineMxn = mxn(c.priceUsd * c.qty);
+      return `• ${c.name} x${c.qty} — $${lineMxn ? lineMxn.toFixed(2) : '?'} MXN`;
+    }).join('%0A');
+    const msg = `Hola! Quiero comprar estas cartas de Bóveda Arcana:%0A${lines}%0A%0ATotal: $${totalMxn ? totalMxn.toFixed(2) : '?'} MXN`;
     window.open(`https://wa.me/${WA_NUMBER}?text=${msg}`, '_blank');
   }
 
@@ -65,7 +76,7 @@ export default function Home() {
                 {it.qty <= 2 && <span className="badge">Últimas {it.qty}</span>}
                 <div className="name">{it.name}</div>
                 <div className="set">{it.condition}</div>
-                <div className="price mono">${Number(it.price).toFixed(2)} MXN</div>
+                <div className="price mono">{rate ? `$${mxn(Number(it.price)).toFixed(2)} MXN` : 'Cargando precio...'}</div>
                 <button className="primary" onClick={() => addToCart(it)}>Agregar</button>
               </div>
             </div>
@@ -88,7 +99,7 @@ export default function Home() {
                 {c.img && <img src={c.img} alt={c.name} />}
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{c.name}</div>
-                  <div className="mono" style={{ color: 'var(--gold)', fontSize: '0.78rem' }}>${c.price.toFixed(2)} MXN</div>
+                  <div className="mono" style={{ color: 'var(--gold)', fontSize: '0.78rem' }}>{rate ? `$${mxn(c.priceUsd).toFixed(2)} MXN` : '...'}</div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
                     <button className="ghost" onClick={() => changeQty(c.id, -1)}>−</button>
                     <span>{c.qty}</span>
@@ -97,7 +108,7 @@ export default function Home() {
                 </div>
               </div>
             ))}
-            <div className="cart-total"><span>Total</span><span className="mono">${total.toFixed(2)} MXN</span></div>
+            <div className="cart-total"><span>Total</span><span className="mono">{totalMxn ? `$${totalMxn.toFixed(2)} MXN` : '...'}</span></div>
             {cart.length === 1 && cart[0].stripe_link && (
               <a href={cart[0].stripe_link} target="_blank" rel="noreferrer">
                 <button className="primary" style={{ width: '100%', marginBottom: 10 }}>Pagar con Stripe</button>
