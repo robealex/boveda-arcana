@@ -9,13 +9,21 @@ export default function Home() {
   const [cart, setCart] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [rate, setRate] = useState(null);
+  const [sortBy, setSortBy] = useState('newest');
 
   useEffect(() => {
     fetch('/api/inventory').then(r => r.json()).then(d => setItems(d.items || []));
     fetch('/api/exchange-rate').then(r => r.json()).then(d => setRate(d.rate));
   }, []);
 
-  const visible = items.filter(it => it.qty > 0 && it.name.toLowerCase().includes(filter.toLowerCase()));
+  const visible = items
+    .filter(it => it.qty > 0 && it.name.toLowerCase().includes(filter.toLowerCase()))
+    .sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      if (sortBy === 'price_asc') return Number(a.price) - Number(b.price);
+      if (sortBy === 'price_desc') return Number(b.price) - Number(a.price);
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
 
   function mxn(usdPrice) {
     if (!rate) return null;
@@ -62,8 +70,16 @@ export default function Home() {
       </div>
 
       <main>
-        <div className="field" style={{ maxWidth: 360, marginBottom: 24 }}>
-          <input placeholder="Filtrar por nombre..." value={filter} onChange={e => setFilter(e.target.value)} />
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 24 }}>
+          <div className="field" style={{ maxWidth: 300, marginBottom: 0 }}>
+            <input placeholder="Filtrar por nombre..." value={filter} onChange={e => setFilter(e.target.value)} />
+          </div>
+          <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ maxWidth: 220 }}>
+            <option value="newest">Más nuevas primero</option>
+            <option value="name">Nombre (A-Z)</option>
+            <option value="price_asc">Precio: menor a mayor</option>
+            <option value="price_desc">Precio: mayor a menor</option>
+          </select>
         </div>
 
         {items.length === 0 && <p className="hint">Todavía no hay cartas publicadas.</p>}
@@ -77,6 +93,7 @@ export default function Home() {
                 <div className="name">{it.name}</div>
                 <div className="set">{it.condition}</div>
                 <div className="price mono">{rate ? `$${mxn(Number(it.price)).toFixed(2)} MXN` : 'Cargando precio...'}</div>
+                <div className="hint" style={{ marginTop: -4 }}>${Number(it.price).toFixed(2)} USD</div>
                 <button className="primary" onClick={() => addToCart(it)}>Agregar</button>
               </div>
             </div>
@@ -99,7 +116,7 @@ export default function Home() {
                 {c.img && <img src={c.img} alt={c.name} />}
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{c.name}</div>
-                  <div className="mono" style={{ color: 'var(--gold)', fontSize: '0.78rem' }}>{rate ? `$${mxn(c.priceUsd).toFixed(2)} MXN` : '...'}</div>
+                  <div className="mono" style={{ color: 'var(--gold)', fontSize: '0.78rem' }}>{rate ? `$${mxn(c.priceUsd).toFixed(2)} MXN` : '...'} <span style={{ color: 'var(--muted)' }}>(${c.priceUsd.toFixed(2)} USD)</span></div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
                     <button className="ghost" onClick={() => changeQty(c.id, -1)}>−</button>
                     <span>{c.qty}</span>

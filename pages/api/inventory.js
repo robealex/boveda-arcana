@@ -40,9 +40,13 @@ export default async function handler(req, res) {
   if (req.method === 'PATCH') {
     if (!checkAdmin(req)) return res.status(401).json({ error: 'Password de administrador incorrecto' });
     const { id } = req.query;
-    const { qty } = req.body;
-    if (!id || qty === undefined) return res.status(400).json({ error: 'Faltan datos' });
-    const item = await prisma.inventory.update({ where: { id: parseInt(id) }, data: { qty } });
+    const { qty, price, condition } = req.body;
+    if (!id) return res.status(400).json({ error: 'Falta id' });
+    const data = {};
+    if (qty !== undefined) data.qty = qty;
+    if (price !== undefined) data.price = price;
+    if (condition !== undefined) data.condition = condition;
+    const item = await prisma.inventory.update({ where: { id: parseInt(id) }, data });
     return res.status(200).json({ item: serialize(item) });
   }
 

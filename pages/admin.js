@@ -9,6 +9,14 @@ export default function Admin() {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
   const [rate, setRate] = useState(null);
+  const [sortBy, setSortBy] = useState('newest');
+
+  const sortedItems = [...items].sort((a, b) => {
+    if (sortBy === 'name') return a.name.localeCompare(b.name);
+    if (sortBy === 'price_asc') return Number(a.price) - Number(b.price);
+    if (sortBy === 'price_desc') return Number(b.price) - Number(a.price);
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  });
 
   useEffect(() => {
     fetch('/api/exchange-rate').then(r => r.json()).then(d => setRate(d.rate));
@@ -68,6 +76,23 @@ export default function Admin() {
     loadInventory();
   }
 
+  async function editItem(it) {
+    const price = prompt(`Nuevo precio en USD para "${it.name}":`, Number(it.price).toFixed(2));
+    if (price === null) return;
+    const qty = prompt('Nueva cantidad disponible:', it.qty);
+    if (qty === null) return;
+    const condition = prompt('Nueva condición:', it.condition || 'Near Mint');
+    if (condition === null) return;
+    if (isNaN(parseFloat(price)) || isNaN(parseInt(qty))) { alert('Precio o cantidad inválidos.'); return; }
+    const r = await fetch(`/api/inventory?id=${it.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
+      body: JSON.stringify({ price: parseFloat(price), qty: parseInt(qty), condition })
+    });
+    if (!r.ok) { const d = await r.json(); alert(d.error || 'Error al actualizar'); return; }
+    loadInventory();
+  }
+
   if (!authed) {
     return (
       <main style={{ maxWidth: 360, marginTop: 100 }}>
@@ -105,16 +130,27 @@ export default function Admin() {
         ))}
       </div>
 
-      <h3>Inventario actual ({items.length})</h3>
-      <div className="grid">
-        {items.map(it => (
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+        <h3 style={{ margin: 0 }}>Inventario actual ({items.length})</h3>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ width: 220 }}>
+          <option value="newest">Más nuevas primero</option>
+          <option value="name">Nombre (A-Z)</option>
+          <option value="price_asc">Precio: menor a mayor</option>
+          <option value="price_desc">Precio: mayor a menor</option>
+        </select>
+      </div>
+      <div className="grid" style={{ marginTop: 16 }}>
+        {sortedItems.map(it => (
           <div className="card" key={it.id}>
             <div className="art">{it.img && <img src={it.img} alt={it.name} />}</div>
             <div className="info">
               <div className="name">{it.name}</div>
               <div className="set">{it.condition} · x{it.qty}</div>
               <div className="price mono">${Number(it.price).toFixed(2)} USD{rate ? ` · ≈$${(Number(it.price) * rate).toFixed(2)} MXN` : ''}</div>
-              <button className="ghost" onClick={() => deleteItem(it.id)}>Eliminar</button>
+              <div className="row" style={{ display: 'flex', gap: 8 }}>
+                <button className="ghost" style={{ flex: 1 }} onClick={() => editItem(it)}>Editar</button>
+                <button className="ghost" style={{ flex: 1 }} onClick={() => deleteItem(it.id)}>Eliminar</button>
+              </div>
             </div>
           </div>
         ))}
