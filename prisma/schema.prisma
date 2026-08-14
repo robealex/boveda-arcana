@@ -37,14 +37,14 @@ model Order {
 }
 
 model OrderItem {
-  id          Int       @id @default(autoincrement())
-  order       Order     @relation(fields: [orderId], references: [id])
-  orderId     Int       @map("order_id")
-  inventory   Inventory @relation(fields: [inventoryId], references: [id])
-  inventoryId Int       @map("inventory_id")
+  id          Int        @id @default(autoincrement())
+  order       Order      @relation(fields: [orderId], references: [id])
+  orderId     Int        @map("order_id")
+  inventory   Inventory? @relation(fields: [inventoryId], references: [id], onDelete: SetNull)
+  inventoryId Int?       @map("inventory_id")
   name        String
   qty         Int
-  priceUsd    Decimal   @map("price_usd")
+  priceUsd    Decimal    @map("price_usd")
 
   @@map("order_items")
 }

@@ -72,8 +72,9 @@ export default async function handler(req, res) {
     if (order.status !== 'pending') return res.status(400).json({ error: 'Este pedido ya fue procesado' });
 
     if (status === 'confirmed') {
+      const stillExisting = order.items.filter(it => it.inventoryId !== null);
       await prisma.$transaction([
-        ...order.items.map(it =>
+        ...stillExisting.map(it =>
           prisma.inventory.update({
             where: { id: it.inventoryId },
             data: { qty: { decrement: it.qty } }
