@@ -56,7 +56,7 @@ export default function Admin() {
     if (!price || isNaN(parseFloat(price))) return;
     const qty = prompt('Cantidad disponible:', '1') || '1';
     const condition = prompt('Condición (Near Mint / Lightly Played / etc.):', 'Near Mint') || 'Near Mint';
-    await saveItem({ name: card.name, set_name: card.set_name, img: card.img, price: parseFloat(price), qty: parseInt(qty), condition });
+    await saveItem({ name: card.name, set_name: card.set_name, img: card.img, price: parseFloat(price), qty: parseInt(qty), condition, colors: card.colors, rarity: card.rarity, type_line: card.type_line });
   }
 
   async function saveItem(payload) {

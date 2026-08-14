@@ -16,6 +16,9 @@ model Inventory {
   qty        Int      @default(1)
   condition  String?
   stripeLink String?  @map("stripe_link")
+  colors     String?
+  rarity     String?
+  typeLine   String?  @map("type_line")
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@map("inventory")

@@ -13,7 +13,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     if (!checkAdmin(req)) return res.status(401).json({ error: 'Password de administrador incorrecto' });
-    const { name, set_name, img, price, qty, condition, stripe_link } = req.body;
+    const { name, set_name, img, price, qty, condition, stripe_link, colors, rarity, type_line } = req.body;
     if (!name || !price) return res.status(400).json({ error: 'Faltan datos: nombre y precio son obligatorios' });
     const item = await prisma.inventory.create({
       data: {
@@ -23,7 +23,10 @@ export default async function handler(req, res) {
         price,
         qty: qty || 1,
         condition: condition || 'Near Mint',
-        stripeLink: stripe_link || ''
+        stripeLink: stripe_link || '',
+        colors: colors || '',
+        rarity: rarity || '',
+        typeLine: type_line || ''
       }
     });
     return res.status(201).json({ item: serialize(item) });

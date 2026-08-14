@@ -16,7 +16,10 @@ export default async function handler(req, res) {
       name: c.name,
       set_name: c.set_name,
       img: c.image_uris?.normal || c.card_faces?.[0]?.image_uris?.normal || '',
-      usd: c.prices?.usd || null
+      usd: c.prices?.usd || null,
+      colors: (c.colors || c.card_faces?.[0]?.colors || []).join(','),
+      rarity: c.rarity || '',
+      type_line: c.type_line || c.card_faces?.[0]?.type_line || ''
     }));
     res.status(200).json({ data: simplified });
   } catch (e) {

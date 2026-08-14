@@ -10,6 +10,16 @@ export default function Home() {
   const [cartOpen, setCartOpen] = useState(false);
   const [rate, setRate] = useState(null);
   const [sortBy, setSortBy] = useState('newest');
+  const [colorFilter, setColorFilter] = useState([]);
+  const [rarityFilter, setRarityFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+
+  const MAIN_TYPES = ['Creature', 'Instant', 'Sorcery', 'Artifact', 'Enchantment', 'Land', 'Planeswalker', 'Battle'];
+  const COLOR_INFO = { W: 'Blanco', U: 'Azul', B: 'Negro', R: 'Rojo', G: 'Verde', C: 'Incoloro' };
+
+  function toggleColor(c) {
+    setColorFilter(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
+  }
 
   useEffect(() => {
     fetch('/api/inventory').then(r => r.json()).then(d => setItems(d.items || []));
@@ -18,6 +28,14 @@ export default function Home() {
 
   const visible = items
     .filter(it => it.qty > 0 && it.name.toLowerCase().includes(filter.toLowerCase()))
+    .filter(it => {
+      if (colorFilter.length === 0) return true;
+      const cardColors = (it.colors || '').split(',').filter(Boolean);
+      if (colorFilter.includes('C') && cardColors.length === 0) return true;
+      return cardColors.some(c => colorFilter.includes(c));
+    })
+    .filter(it => !rarityFilter || it.rarity === rarityFilter)
+    .filter(it => !typeFilter || (it.typeLine || '').includes(typeFilter))
     .sort((a, b) => {
       if (sortBy === 'name') return a.name.localeCompare(b.name);
       if (sortBy === 'price_asc') return Number(a.price) - Number(b.price);
@@ -51,14 +69,31 @@ export default function Home() {
   const totalUsd = cart.reduce((s, c) => s + c.priceUsd * c.qty, 0);
   const totalMxn = mxn(totalUsd);
 
-  function checkoutWhatsapp() {
+  async function checkoutWhatsapp() {
     if (!WA_NUMBER) { alert('El vendedor todavía no configuró su número de WhatsApp (NEXT_PUBLIC_WHATSAPP_NUMBER).'); return; }
+    try {
+      const r = await fetch('/api/reserve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: cart.map(c => ({ id: c.id, qty: c.qty })) })
+      });
+      const d = await r.json();
+      if (!r.ok) { alert(d.error || 'No se pudo apartar el pedido, intenta de nuevo.'); return; }
+    } catch (e) {
+      alert('No se pudo apartar el pedido, intenta de nuevo.');
+      return;
+    }
+
     const lines = cart.map(c => {
       const lineMxn = mxn(c.priceUsd * c.qty);
       return `• ${c.name} x${c.qty} — $${lineMxn ? lineMxn.toFixed(2) : '?'} MXN`;
     }).join('%0A');
     const msg = `Hola! Quiero comprar estas cartas de Bóveda Arcana:%0A${lines}%0A%0ATotal: $${totalMxn ? totalMxn.toFixed(2) : '?'} MXN`;
     window.open(`https://wa.me/${WA_NUMBER}?text=${msg}`, '_blank');
+
+    setCart([]);
+    setCartOpen(false);
+    fetch('/api/inventory').then(r => r.json()).then(d => setItems(d.items || []));
   }
 
   return (
@@ -70,7 +105,7 @@ export default function Home() {
       </div>
 
       <main>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 24 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
           <div className="field" style={{ maxWidth: 300, marginBottom: 0 }}>
             <input placeholder="Filtrar por nombre..." value={filter} onChange={e => setFilter(e.target.value)} />
           </div>
@@ -80,6 +115,33 @@ export default function Home() {
             <option value="price_asc">Precio: menor a mayor</option>
             <option value="price_desc">Precio: mayor a menor</option>
           </select>
+          <select value={rarityFilter} onChange={e => setRarityFilter(e.target.value)} style={{ maxWidth: 180 }}>
+            <option value="">Cualquier rareza</option>
+            <option value="common">Common</option>
+            <option value="uncommon">Uncommon</option>
+            <option value="rare">Rare</option>
+            <option value="mythic">Mythic</option>
+          </select>
+          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={{ maxWidth: 180 }}>
+            <option value="">Cualquier tipo</option>
+            {MAIN_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
+          {Object.entries(COLOR_INFO).map(([code, label]) => (
+            <button
+              key={code}
+              className="ghost"
+              onClick={() => toggleColor(code)}
+              style={{
+                borderColor: colorFilter.includes(code) ? 'var(--gold)' : 'var(--line)',
+                background: colorFilter.includes(code) ? 'rgba(201,162,39,0.12)' : 'transparent',
+                color: colorFilter.includes(code) ? 'var(--gold)' : 'var(--parchment)'
+              }}
+            >{label}</button>
+          ))}
+          {colorFilter.length > 0 && <button className="ghost" onClick={() => setColorFilter([])}>Limpiar colores</button>}
         </div>
 
         {items.length === 0 && <p className="hint">Todavía no hay cartas publicadas.</p>}
@@ -132,6 +194,7 @@ export default function Home() {
               </a>
             )}
             <button className="primary" style={{ width: '100%' }} onClick={checkoutWhatsapp}>Enviar pedido por WhatsApp</button>
+            <p className="hint" style={{ marginTop: 8 }}>Al enviar, apartamos estas cartas para ti automáticamente.</p>
             <button className="ghost" style={{ width: '100%', marginTop: 8 }} onClick={() => setCartOpen(false)}>Cerrar</button>
           </div>
         </>
