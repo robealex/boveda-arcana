@@ -31,6 +31,7 @@ export default function MisPedidos() {
         <div className="eyebrow">Bóveda Arcana</div>
         <h1>Mis pedidos</h1>
         <p className="sub">Pon el teléfono que usaste al hacer tu pedido para ver su estatus.</p>
+        <p style={{ marginTop: 10 }}><a href="/" style={{ color: 'var(--gold)', fontSize: '0.85rem' }}>← Volver a la tienda</a></p>
       </div>
 
       <main style={{ maxWidth: 500 }}>
