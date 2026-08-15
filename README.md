@@ -53,6 +53,19 @@ En tu proyecto de Vercel: **Settings → Environment Variables**, agrega estas
 | `ADMIN_PASSWORD` | la contraseña que tú quieras para entrar a `/admin` | `MiTiendaSegura2026` |
 | `NEXT_PUBLIC_WHATSAPP_NUMBER` | tu número con lada, sin espacios ni signos | `52646XXXXXXX` |
 | `NEXT_PUBLIC_SHOP_OWNER` | tu nombre (aparece en la tienda) | `Osani` |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | correo que se muestra en la sección de contacto (opcional) | `robealex@hotmail.com` |
+| `RESEND_API_KEY` | para que te lleguen correos de nuevos pedidos (ver abajo) | `re_xxxxxxxx` |
+| `CUSTOMER_JWT_SECRET` | cualquier texto largo y aleatorio, para las sesiones de cuenta de cliente | `una-frase-larga-y-random-123` |
+
+### Correos de pedidos (Resend)
+
+Para que te llegue un correo a robealex@hotmail.com cada vez que entra un pedido:
+1. Crea una cuenta gratis en [resend.com](https://resend.com).
+2. En su panel, ve a **API Keys** → crea una → cópiala y pégala como `RESEND_API_KEY` en Vercel.
+3. **Importante:** sin verificar un dominio propio en Resend, su plan gratis solo te deja mandar correos a la
+   cuenta con la que te registraste ahí (modo de prueba). Si quieres que también le lleguen confirmaciones a tus
+   clientes con otros correos, necesitas verificar un dominio en Resend (Settings → Domains) — si no, esos correos
+   a clientes simplemente no se enviarán, sin que truene nada más de la tienda.
 
 La tabla de la base de datos se crea sola en cada build (el comando de build
 incluye `prisma db push`), así que no tienes que crear ninguna tabla a mano.

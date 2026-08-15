@@ -8,34 +8,66 @@ datasource db {
 }
 
 model Inventory {
-  id          Int      @id @default(autoincrement())
-  name        String
-  setName     String?  @map("set_name")
-  img         String?
-  price       Decimal
-  qty         Int      @default(1)
-  condition   String?
-  stripeLink  String?  @map("stripe_link")
-  colors      String?
-  rarity      String?
-  typeLine    String?  @map("type_line")
-  foil        Boolean  @default(false)
-  language    String   @default("en")
-  scryfallUri String?  @map("scryfall_uri")
-  createdAt   DateTime @default(now()) @map("created_at")
-  orderItems  OrderItem[]
+  id            Int      @id @default(autoincrement())
+  name          String
+  setName       String?  @map("set_name")
+  img           String?
+  price         Decimal
+  originalPrice Decimal? @map("original_price")
+  qty           Int      @default(1)
+  condition     String?
+  stripeLink    String?  @map("stripe_link")
+  colors        String?
+  rarity        String?
+  typeLine      String?  @map("type_line")
+  foil          Boolean  @default(false)
+  language      String   @default("en")
+  scryfallUri   String?  @map("scryfall_uri")
+  notes         String?
+  views         Int      @default(0)
+  createdAt     DateTime @default(now()) @map("created_at")
+  orderItems    OrderItem[]
+  priceHistory  PriceSnapshot[]
 
   @@map("inventory")
 }
 
+model PriceSnapshot {
+  id          Int       @id @default(autoincrement())
+  inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  inventoryId Int       @map("inventory_id")
+  myPrice     Decimal   @map("my_price")
+  refPrice    Decimal?  @map("ref_price")
+  recordedAt  DateTime  @default(now()) @map("recorded_at")
+
+  @@map("price_snapshots")
+}
+
+model Customer {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  phone        String?
+  address      String?
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  orders       Order[]
+
+  @@map("customers")
+}
+
 model Order {
-  id           Int         @id @default(autoincrement())
-  status       String      @default("pending") // pending | confirmed | cancelled
-  expiresAt    DateTime    @map("expires_at")
-  totalUsd     Decimal     @map("total_usd")
-  customerName String?     @map("customer_name")
-  createdAt    DateTime    @default(now()) @map("created_at")
-  items        OrderItem[]
+  id            Int         @id @default(autoincrement())
+  status        String      @default("pending") // pending | confirmed | cancelled
+  expiresAt     DateTime    @map("expires_at")
+  totalUsd      Decimal     @map("total_usd")
+  customerName  String?     @map("customer_name")
+  customerPhone String?     @map("customer_phone")
+  customerEmail String?     @map("customer_email")
+  customer      Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerId    Int?        @map("customer_id")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  items         OrderItem[]
 
   @@map("orders")
 }

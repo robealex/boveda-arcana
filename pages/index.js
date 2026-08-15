@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '';
 const SHOP_OWNER = process.env.NEXT_PUBLIC_SHOP_OWNER || '';
+const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || '';
 const LANGUAGES = { en: 'Inglés', es: 'Español', ja: 'Japonés', de: 'Alemán', fr: 'Francés', it: 'Italiano', pt: 'Portugués', ru: 'Ruso', ko: 'Coreano', zhs: 'Chino simpl.', zht: 'Chino trad.' };
 
 export default function Home() {
@@ -15,6 +16,9 @@ export default function Home() {
   const [rarityFilter, setRarityFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [detailItem, setDetailItem] = useState(null);
+  const [account, setAccount] = useState(null);
+  const [checkoutForm, setCheckoutForm] = useState({ name: '', phone: '', email: '' });
+  const [showCheckoutForm, setShowCheckoutForm] = useState(false);
 
   const MAIN_TYPES = ['Creature', 'Instant', 'Sorcery', 'Artifact', 'Enchantment', 'Land', 'Planeswalker', 'Battle'];
   const COLOR_INFO = { W: 'Blanco', U: 'Azul', B: 'Negro', R: 'Rojo', G: 'Verde', C: 'Incoloro' };
@@ -30,7 +34,27 @@ export default function Home() {
   useEffect(() => {
     loadInventory();
     fetch('/api/exchange-rate').then(r => r.json()).then(d => setRate(d.rate));
+    const token = typeof window !== 'undefined' ? localStorage.getItem('customer_token') : null;
+    if (token) {
+      fetch('/api/auth/me', { headers: { 'x-customer-token': token } })
+        .then(r => r.json())
+        .then(d => {
+          if (d.customer) {
+            setAccount(d.customer);
+            setCheckoutForm({ name: d.customer.name || '', phone: d.customer.phone || '', email: d.customer.email || '' });
+          }
+        });
+    }
   }, []);
+
+  useEffect(() => {
+    if (!detailItem) return;
+    fetch('/api/track-view', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: detailItem.id })
+    }).catch(() => {});
+  }, [detailItem?.id]);
 
   const visible = items
     .filter(it => it.name.toLowerCase().includes(filter.toLowerCase()))
@@ -77,16 +101,23 @@ export default function Home() {
   const totalUsd = cart.reduce((s, c) => s + c.priceUsd * c.qty, 0);
   const totalMxn = mxn(totalUsd);
 
-  async function checkoutWhatsapp() {
+  function startCheckout() {
     if (!WA_NUMBER) { alert('El vendedor todavía no configuró su número de WhatsApp (NEXT_PUBLIC_WHATSAPP_NUMBER).'); return; }
-    const customerName = prompt('¿Cuál es tu nombre? (para que el vendedor sepa quién hace el pedido)');
-    if (customerName === null) return;
+    setShowCheckoutForm(true);
+  }
 
+  async function confirmCheckout() {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('customer_token') : null;
     try {
       const r = await fetch('/api/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: cart.map(c => ({ id: c.id, qty: c.qty })), customerName: customerName.trim() || null })
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'x-customer-token': token } : {}) },
+        body: JSON.stringify({
+          items: cart.map(c => ({ id: c.id, qty: c.qty })),
+          customerName: checkoutForm.name.trim() || null,
+          customerPhone: checkoutForm.phone.trim() || null,
+          customerEmail: checkoutForm.email.trim() || null
+        })
       });
       const d = await r.json();
       if (!r.ok) { alert(d.error || 'No se pudo apartar el pedido, intenta de nuevo.'); return; }
@@ -99,13 +130,20 @@ export default function Home() {
       const lineMxn = mxn(c.priceUsd * c.qty);
       return `• ${c.name} x${c.qty} — $${lineMxn ? lineMxn.toFixed(2) : '?'} MXN`;
     }).join('%0A');
-    const nameLine = customerName.trim() ? `Mi nombre: ${customerName.trim()}%0A` : '';
+    const nameLine = checkoutForm.name.trim() ? `Mi nombre: ${checkoutForm.name.trim()}%0A` : '';
     const msg = `Hola! Quiero comprar estas cartas de Bóveda Arcana:%0A${nameLine}${lines}%0A%0ATotal: $${totalMxn ? totalMxn.toFixed(2) : '?'} MXN`;
     window.open(`https://wa.me/${WA_NUMBER}?text=${msg}`, '_blank');
 
     setCart([]);
     setCartOpen(false);
+    setShowCheckoutForm(false);
     loadInventory();
+  }
+
+  function logout() {
+    localStorage.removeItem('customer_token');
+    setAccount(null);
+    setCheckoutForm({ name: '', phone: '', email: '' });
   }
 
   function CardBadges({ it }) {
@@ -123,6 +161,17 @@ export default function Home() {
         <div className="eyebrow">Colección personal · Ensenada, MX</div>
         <h1>Bóveda Arcana</h1>
         <p className="sub">Cartas de Magic: The Gathering en venta{SHOP_OWNER ? ` · por ${SHOP_OWNER}` : ''}. Selecciona las que quieras y te contactamos para cerrar la venta.</p>
+        <div style={{ marginTop: 10, display: 'flex', gap: 16, justifyContent: 'center', fontSize: '0.85rem', flexWrap: 'wrap' }}>
+          <a href="/mis-pedidos" style={{ color: 'var(--gold)' }}>Ver el estatus de mis pedidos →</a>
+          {account ? (
+            <>
+              <a href="/cuenta" style={{ color: 'var(--gold)' }}>Mi cuenta ({account.name})</a>
+              <button className="ghost" style={{ padding: '2px 10px', fontSize: '0.8rem' }} onClick={logout}>Cerrar sesión</button>
+            </>
+          ) : (
+            <a href="/cuenta" style={{ color: 'var(--gold)' }}>Iniciar sesión / crear cuenta</a>
+          )}
+        </div>
       </div>
 
       <main>
@@ -179,8 +228,12 @@ export default function Home() {
                 <div className="art">{it.img && <img src={it.img} alt={it.name} />}</div>
                 <div className="info">
                   {soldOut ? <span className="badge" style={{ background: 'var(--muted)' }}>Agotado</span> : it.qty <= 2 && <span className="badge">Últimas {it.qty}</span>}
+                  {it.originalPrice && it.originalPrice > it.price && <span className="badge" style={{ background: 'var(--teal)', marginLeft: it.qty <= 2 || soldOut ? 6 : 0 }}>Oferta</span>}
                   <div className="name"><CardBadges it={it} /> {it.name}</div>
                   <div className="set">{it.condition}</div>
+                  {it.originalPrice && it.originalPrice > it.price && rate && (
+                    <div className="hint" style={{ textDecoration: 'line-through', marginBottom: -4 }}>${mxn(Number(it.originalPrice)).toFixed(2)} MXN</div>
+                  )}
                   <div className="price mono">{rate ? `$${mxn(Number(it.price)).toFixed(2)} MXN` : 'Cargando precio...'}</div>
                   <div className="hint" style={{ marginTop: -4 }}>${Number(it.price).toFixed(2)} USD</div>
                   <button className="primary" disabled={soldOut} style={soldOut ? { opacity: 0.5, cursor: 'not-allowed' } : {}} onClick={e => { e.stopPropagation(); addToCart(it); }}>
@@ -218,13 +271,29 @@ export default function Home() {
               </div>
             ))}
             <div className="cart-total"><span>Total</span><span className="mono">{totalMxn ? `$${totalMxn.toFixed(2)} MXN` : '...'}</span></div>
-            {cart.length === 1 && cart[0].stripe_link && (
-              <a href={cart[0].stripe_link} target="_blank" rel="noreferrer">
-                <button className="primary" style={{ width: '100%', marginBottom: 10 }}>Pagar con Stripe</button>
-              </a>
+
+            {!showCheckoutForm && (
+              <>
+                {cart.length === 1 && cart[0].stripe_link && (
+                  <a href={cart[0].stripe_link} target="_blank" rel="noreferrer">
+                    <button className="primary" style={{ width: '100%', marginBottom: 10 }}>Pagar con Stripe</button>
+                  </a>
+                )}
+                <button className="primary" style={{ width: '100%' }} onClick={startCheckout}>Enviar pedido por WhatsApp</button>
+                <p className="hint" style={{ marginTop: 8 }}>Al enviar, apartamos estas cartas por 48 horas mientras confirmamos tu pedido.</p>
+              </>
             )}
-            <button className="primary" style={{ width: '100%' }} onClick={checkoutWhatsapp}>Enviar pedido por WhatsApp</button>
-            <p className="hint" style={{ marginTop: 8 }}>Al enviar, apartamos estas cartas por 48 horas mientras confirmamos tu pedido.</p>
+
+            {showCheckoutForm && (
+              <div style={{ marginTop: 12 }}>
+                <div className="field"><label>Tu nombre</label><input value={checkoutForm.name} onChange={e => setCheckoutForm(f => ({ ...f, name: e.target.value }))} /></div>
+                <div className="field"><label>Tu teléfono</label><input value={checkoutForm.phone} onChange={e => setCheckoutForm(f => ({ ...f, phone: e.target.value }))} /></div>
+                <div className="field"><label>Tu correo (opcional, para confirmación)</label><input value={checkoutForm.email} onChange={e => setCheckoutForm(f => ({ ...f, email: e.target.value }))} /></div>
+                <button className="primary" style={{ width: '100%' }} onClick={confirmCheckout}>Confirmar y enviar por WhatsApp</button>
+                <button className="ghost" style={{ width: '100%', marginTop: 8 }} onClick={() => setShowCheckoutForm(false)}>Atrás</button>
+              </div>
+            )}
+
             <button className="ghost" style={{ width: '100%', marginTop: 8 }} onClick={() => setCartOpen(false)}>Cerrar</button>
           </div>
         </>
@@ -241,7 +310,12 @@ export default function Home() {
               {detailItem.colors && <span>Colores: {detailItem.colors.split(',').filter(Boolean).join(', ') || 'Incoloro'}</span>}
               {detailItem.rarity && <span>Rareza: {detailItem.rarity}</span>}
             </div>
-            <div className="price mono" style={{ fontSize: '1.3rem' }}>{rate ? `$${mxn(Number(detailItem.price)).toFixed(2)} MXN` : '...'}</div>
+            <div className="price mono" style={{ fontSize: '1.3rem' }}>
+              {detailItem.originalPrice && detailItem.originalPrice > detailItem.price && rate && (
+                <span style={{ textDecoration: 'line-through', color: 'var(--muted)', fontSize: '1rem', marginRight: 8 }}>${mxn(Number(detailItem.originalPrice)).toFixed(2)}</span>
+              )}
+              {rate ? `$${mxn(Number(detailItem.price)).toFixed(2)} MXN` : '...'}
+            </div>
             <p className="hint" style={{ marginTop: 0 }}>${Number(detailItem.price).toFixed(2)} USD · {detailItem.qty > 0 ? `${detailItem.qty} disponibles` : 'Agotado'}</p>
             <button
               className="primary"
@@ -261,7 +335,15 @@ export default function Home() {
         </div>
       )}
 
-      <footer>Bóveda Arcana · Precios de referencia cortesía de Scryfall</footer>
+      <footer>
+        <div style={{ marginBottom: 10 }}>
+          <strong style={{ color: 'var(--parchment)' }}>Contacto</strong><br />
+          {SHOP_OWNER && <span>{SHOP_OWNER}</span>}
+          {WA_NUMBER && <span> · WhatsApp: {WA_NUMBER}</span>}
+          {CONTACT_EMAIL && <span> · {CONTACT_EMAIL}</span>}
+        </div>
+        Bóveda Arcana · Precios de referencia cortesía de Scryfall
+      </footer>
     </div>
   );
 }

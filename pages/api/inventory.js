@@ -1,15 +1,18 @@
 import { prisma } from '../../lib/prisma';
 import { checkAdmin } from '../../lib/auth';
 
-function serialize(item, reservedMap) {
+function serialize(item, reservedMap, isAdmin) {
   const reserved = reservedMap?.get(item.id) || 0;
-  return {
+  const out = {
     ...item,
     price: Number(item.price),
+    originalPrice: item.originalPrice !== null && item.originalPrice !== undefined ? Number(item.originalPrice) : null,
     rawQty: item.qty,
     reserved,
     qty: Math.max(0, item.qty - reserved)
   };
+  if (!isAdmin) delete out.notes;
+  return out;
 }
 
 async function getReservedMap() {
@@ -22,12 +25,13 @@ async function getReservedMap() {
 }
 
 function buildData(body) {
-  const { name, set_name, img, price, qty, condition, stripe_link, colors, rarity, type_line, foil, language, scryfall_uri } = body;
+  const { name, set_name, img, price, original_price, qty, condition, stripe_link, colors, rarity, type_line, foil, language, scryfall_uri, notes } = body;
   const data = {};
   if (name !== undefined) data.name = name;
   if (set_name !== undefined) data.setName = set_name || '';
   if (img !== undefined) data.img = img || '';
   if (price !== undefined) data.price = price;
+  if (original_price !== undefined) data.originalPrice = original_price === '' || original_price === null ? null : original_price;
   if (qty !== undefined) data.qty = qty;
   if (condition !== undefined) data.condition = condition || 'Near Mint';
   if (stripe_link !== undefined) data.stripeLink = stripe_link || '';
@@ -37,30 +41,36 @@ function buildData(body) {
   if (foil !== undefined) data.foil = Boolean(foil);
   if (language !== undefined) data.language = language || 'en';
   if (scryfall_uri !== undefined) data.scryfallUri = scryfall_uri || '';
+  if (notes !== undefined) data.notes = notes || '';
   return data;
 }
 
 export default async function handler(req, res) {
+  const isAdmin = checkAdmin(req);
+
   if (req.method === 'GET') {
     const [items, reservedMap] = await Promise.all([
       prisma.inventory.findMany({ orderBy: { createdAt: 'desc' } }),
       getReservedMap()
     ]);
-    return res.status(200).json({ items: items.map(it => serialize(it, reservedMap)) });
+    return res.status(200).json({ items: items.map(it => serialize(it, reservedMap, isAdmin)) });
   }
 
   if (req.method === 'POST') {
-    if (!checkAdmin(req)) return res.status(401).json({ error: 'Password de administrador incorrecto' });
+    if (!isAdmin) return res.status(401).json({ error: 'Password de administrador incorrecto' });
     if (!req.body.name || !req.body.price) return res.status(400).json({ error: 'Faltan datos: nombre y precio son obligatorios' });
     const data = buildData(req.body);
     data.qty = data.qty || 1;
     data.condition = data.condition || 'Near Mint';
     const item = await prisma.inventory.create({ data });
-    return res.status(201).json({ item: serialize(item) });
+    await prisma.priceSnapshot.create({
+      data: { inventoryId: item.id, myPrice: item.price, refPrice: req.body.ref_usd || null }
+    });
+    return res.status(201).json({ item: serialize(item, null, true) });
   }
 
   if (req.method === 'DELETE') {
-    if (!checkAdmin(req)) return res.status(401).json({ error: 'Password de administrador incorrecto' });
+    if (!isAdmin) return res.status(401).json({ error: 'Password de administrador incorrecto' });
     const { id } = req.query;
     if (!id) return res.status(400).json({ error: 'Falta id' });
     try {
@@ -72,12 +82,17 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'PATCH') {
-    if (!checkAdmin(req)) return res.status(401).json({ error: 'Password de administrador incorrecto' });
+    if (!isAdmin) return res.status(401).json({ error: 'Password de administrador incorrecto' });
     const { id } = req.query;
     if (!id) return res.status(400).json({ error: 'Falta id' });
     const data = buildData(req.body);
     const item = await prisma.inventory.update({ where: { id: parseInt(id) }, data });
-    return res.status(200).json({ item: serialize(item) });
+    if (data.price !== undefined) {
+      await prisma.priceSnapshot.create({
+        data: { inventoryId: item.id, myPrice: item.price, refPrice: req.body.ref_usd || null }
+      });
+    }
+    return res.status(200).json({ item: serialize(item, null, true) });
   }
 
   res.status(405).json({ error: 'Método no permitido' });

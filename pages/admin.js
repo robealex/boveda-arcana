@@ -101,11 +101,12 @@ export default function Admin() {
     setModalItem({
       mode: 'add',
       name: card.name, set_name: card.set_name || '', img: card.img || '',
-      price: card.usd || '', qty: 1, condition: 'Near Mint',
+      price: card.usd || '', original_price: '', qty: 1, condition: 'Near Mint',
       colors: (card.colors || '').split(',').filter(Boolean),
       rarity: card.rarity || '', type_line: card.type_line || '',
       foil: Boolean(card.foil), language: card.lang || 'en',
-      stripe_link: '', scryfall_uri: card.scryfall_uri || ''
+      stripe_link: '', scryfall_uri: card.scryfall_uri || '', notes: '',
+      ref_usd: card.usd || null
     });
   }
 
@@ -113,16 +114,53 @@ export default function Admin() {
     setModalItem({
       mode: 'edit', id: it.id,
       name: it.name, set_name: it.setName || '', img: it.img || '',
-      price: Number(it.price), qty: it.rawQty, condition: it.condition || 'Near Mint',
+      price: Number(it.price), original_price: it.originalPrice !== null && it.originalPrice !== undefined ? Number(it.originalPrice) : '',
+      qty: it.rawQty, condition: it.condition || 'Near Mint',
       colors: (it.colors || '').split(',').filter(Boolean),
       rarity: it.rarity || '', type_line: it.typeLine || '',
       foil: Boolean(it.foil), language: it.language || 'en',
-      stripe_link: it.stripeLink || '', scryfall_uri: it.scryfallUri || ''
+      stripe_link: it.stripeLink || '', scryfall_uri: it.scryfallUri || '',
+      notes: it.notes || '', ref_usd: null
+    });
+  }
+
+  function duplicateItem(it) {
+    setModalItem({
+      mode: 'add',
+      name: it.name, set_name: it.setName || '', img: it.img || '',
+      price: Number(it.price), original_price: it.originalPrice !== null && it.originalPrice !== undefined ? Number(it.originalPrice) : '',
+      qty: 1, condition: it.condition || 'Near Mint',
+      colors: (it.colors || '').split(',').filter(Boolean),
+      rarity: it.rarity || '', type_line: it.typeLine || '',
+      foil: Boolean(it.foil), language: it.language || 'en',
+      stripe_link: it.stripeLink || '', scryfall_uri: it.scryfallUri || '',
+      notes: '', ref_usd: null
     });
   }
 
   function toggleModalColor(c) {
     setModalItem(m => ({ ...m, colors: m.colors.includes(c) ? m.colors.filter(x => x !== c) : [...m.colors, c] }));
+  }
+
+  async function refreshRefPrice() {
+    if (!modalItem?.name) return;
+    setModalItem(m => ({ ...m, refreshing: true }));
+    try {
+      const r = await fetch('/api/card-lookup?name=' + encodeURIComponent(modalItem.name));
+      const d = await r.json();
+      if (r.ok) setModalItem(m => ({ ...m, ref_usd: d.usd || null, refreshing: false }));
+      else setModalItem(m => ({ ...m, refreshing: false }));
+    } catch (e) {
+      setModalItem(m => ({ ...m, refreshing: false }));
+    }
+  }
+
+  const [priceHistory, setPriceHistory] = useState(null);
+  async function loadPriceHistory(id) {
+    setPriceHistory('loading');
+    const r = await fetch(`/api/price-history?id=${id}`, { headers: { 'x-admin-password': pw } });
+    const d = await r.json();
+    setPriceHistory(d.snapshots || []);
   }
 
   async function saveModalItem() {
@@ -132,9 +170,12 @@ export default function Admin() {
     if (isNaN(parseInt(m.qty))) { alert('Cantidad inválida.'); return; }
     const payload = {
       name: m.name.trim(), set_name: m.set_name, img: m.img,
-      price: parseFloat(m.price), qty: parseInt(m.qty), condition: m.condition,
+      price: parseFloat(m.price),
+      original_price: m.original_price === '' ? null : parseFloat(m.original_price),
+      qty: parseInt(m.qty), condition: m.condition,
       colors: m.colors.join(','), rarity: m.rarity, type_line: m.type_line,
-      foil: m.foil, language: m.language, stripe_link: m.stripe_link, scryfall_uri: m.scryfall_uri
+      foil: m.foil, language: m.language, stripe_link: m.stripe_link, scryfall_uri: m.scryfall_uri,
+      notes: m.notes, ref_usd: m.ref_usd
     };
     const url = m.mode === 'edit' ? `/api/inventory?id=${m.id}` : '/api/inventory';
     const method = m.mode === 'edit' ? 'PATCH' : 'POST';
@@ -144,6 +185,7 @@ export default function Admin() {
     });
     if (!r.ok) { const d = await r.json(); alert(d.error || 'Error al guardar'); return; }
     setModalItem(null);
+    setPriceHistory(null);
     loadInventory();
   }
 
@@ -163,6 +205,33 @@ export default function Admin() {
   }
 
   useEffect(() => { if (authed && view === 'orders') loadOrders(); }, [authed, view]);
+  useEffect(() => { if (authed && view === 'users') loadCustomers(); }, [authed, view]);
+
+  const [customers, setCustomers] = useState([]);
+  const [editingCustomer, setEditingCustomer] = useState(null);
+
+  function loadCustomers() {
+    fetch('/api/customers', { headers: { 'x-admin-password': pw } }).then(r => r.json()).then(d => setCustomers(d.customers || []));
+  }
+
+  async function saveCustomer() {
+    const c = editingCustomer;
+    const r = await fetch(`/api/customers?id=${c.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
+      body: JSON.stringify({ name: c.name, phone: c.phone, address: c.address, email: c.email })
+    });
+    if (!r.ok) { const d = await r.json(); alert(d.error || 'Error al guardar'); return; }
+    setEditingCustomer(null);
+    loadCustomers();
+  }
+
+  async function deleteCustomer(id) {
+    if (!confirm('¿Eliminar esta cuenta de cliente? Sus pedidos pasados se conservan.')) return;
+    const r = await fetch(`/api/customers?id=${id}`, { method: 'DELETE', headers: { 'x-admin-password': pw } });
+    if (!r.ok) { const d = await r.json(); alert(d.error || 'Error al eliminar'); return; }
+    loadCustomers();
+  }
 
   function orderDisplayStatus(o) {
     if (o.status === 'pending' && new Date(o.expiresAt) < new Date()) return 'Vencido';
@@ -350,6 +419,7 @@ export default function Admin() {
       <div className="tabs" style={{ justifyContent: 'flex-start', marginBottom: 28 }}>
         <button className={`tab-btn ${view === 'inventory' ? 'active' : ''}`} onClick={() => setView('inventory')}>Inventario</button>
         <button className={`tab-btn ${view === 'orders' ? 'active' : ''}`} onClick={() => setView('orders')}>Pedidos</button>
+        <button className={`tab-btn ${view === 'users' ? 'active' : ''}`} onClick={() => setView('users')}>Usuarios</button>
       </div>
 
       {view === 'inventory' && (
@@ -536,10 +606,13 @@ export default function Admin() {
               <div className="name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{it.name} {it.foil && <span className="foil-badge" title="Foil" />}</div>
               <div className="set">
                 {it.condition} · x{it.rawQty}{it.reserved > 0 ? ` (${it.reserved} apartadas, ${it.qty} libres)` : ''} · {LANGUAGES[it.language] || it.language}
+                {it.views > 0 && <span> · 👁 {it.views}</span>}
               </div>
               <div className="price mono">${Number(it.price).toFixed(2)} USD{rate ? ` · ≈$${(Number(it.price) * rate).toFixed(2)} MXN` : ''}</div>
-              <div className="row" style={{ display: 'flex', gap: 8 }}>
+              {it.originalPrice && <div className="hint" style={{ marginTop: -4, textDecoration: 'line-through' }}>antes ${Number(it.originalPrice).toFixed(2)} USD</div>}
+              <div className="row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button className="ghost" style={{ flex: 1 }} onClick={() => openEditModal(it)}>Editar</button>
+                <button className="ghost" style={{ flex: 1 }} onClick={() => duplicateItem(it)}>Duplicar</button>
                 <button className="ghost" style={{ flex: 1 }} onClick={() => deleteItem(it.id)}>Eliminar</button>
               </div>
             </div>
@@ -562,7 +635,7 @@ export default function Admin() {
                   <div>
                     <span style={{ color: badgeColor, fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{st}</span>
                     <span className="hint" style={{ marginLeft: 10 }}>Pedido #{o.id} · {new Date(o.createdAt).toLocaleString('es-MX')}</span>
-                    {o.customerName && <div style={{ fontSize: '0.85rem', marginTop: 2 }}>Cliente: <strong>{o.customerName}</strong></div>}
+                    {o.customerName && <div style={{ fontSize: '0.85rem', marginTop: 2 }}>Cliente: <strong>{o.customerName}</strong>{o.customerPhone ? ` · ${o.customerPhone}` : ''}</div>}
                   </div>
                   {o.status === 'pending' && st !== 'Vencido' && (
                     <span className="hint">{timeLeft(o.expiresAt)}</span>
@@ -605,6 +678,47 @@ export default function Admin() {
           })}
         </div>
       )}
+
+      {view === 'users' && (
+        <div>
+          <h3 style={{ marginTop: 8 }}>Usuarios registrados ({customers.length})</h3>
+          <p className="hint">Solo aparecen aquí quienes crearon una cuenta. Los pedidos de invitados no generan usuario.</p>
+          {customers.length === 0 && <p className="hint">Todavía no hay usuarios registrados.</p>}
+          {customers.map(c => (
+            <div key={c.id} style={{ background: 'var(--ink2)', border: '1px solid var(--line)', borderRadius: 10, padding: 16, marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                <div>
+                  <strong>{c.name}</strong>
+                  <span className="hint" style={{ marginLeft: 10 }}>{c.email}</span>
+                  {c.phone && <span className="hint" style={{ marginLeft: 10 }}>{c.phone}</span>}
+                  <div className="hint">Registrado {new Date(c.createdAt).toLocaleDateString('es-MX')} · {c.orderCount} pedido(s)</div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="ghost" onClick={() => setEditingCustomer({ ...c })}>Editar</button>
+                  <button className="ghost" onClick={() => deleteCustomer(c.id)}>Eliminar</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {editingCustomer && (
+        <div className="modal-bg show">
+          <div className="modal" style={{ maxWidth: 380 }}>
+            <h3 style={{ marginTop: 0 }}>Editar usuario</h3>
+            <div className="field"><label>Nombre</label><input value={editingCustomer.name} onChange={e => setEditingCustomer(c => ({ ...c, name: e.target.value }))} /></div>
+            <div className="field"><label>Correo</label><input value={editingCustomer.email} onChange={e => setEditingCustomer(c => ({ ...c, email: e.target.value }))} /></div>
+            <div className="field"><label>Teléfono</label><input value={editingCustomer.phone || ''} onChange={e => setEditingCustomer(c => ({ ...c, phone: e.target.value }))} /></div>
+            <div className="field"><label>Dirección</label><input value={editingCustomer.address || ''} onChange={e => setEditingCustomer(c => ({ ...c, address: e.target.value }))} /></div>
+            <div className="modal-actions">
+              <button className="ghost" onClick={() => setEditingCustomer(null)}>Cancelar</button>
+              <button className="primary" onClick={saveCustomer}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modalItem && (
         <div className="modal-bg show">
           <div className="modal" style={{ maxWidth: 480, maxHeight: '85vh', overflowY: 'auto' }}>
@@ -620,6 +734,34 @@ export default function Admin() {
               <div className="field" style={{ flex: 1 }}><label>Precio (USD)</label><input type="number" value={modalItem.price} onChange={e => setModalItem(m => ({ ...m, price: e.target.value }))} /></div>
               <div className="field" style={{ flex: 1 }}><label>Cantidad</label><input type="number" value={modalItem.qty} onChange={e => setModalItem(m => ({ ...m, qty: e.target.value }))} /></div>
             </div>
+
+            <div className="field">
+              <label>Precio original (opcional, para mostrar oferta tachada)</label>
+              <input type="number" value={modalItem.original_price} onChange={e => setModalItem(m => ({ ...m, original_price: e.target.value }))} placeholder="ej. 15.00" />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: '0.8rem' }}>
+              <span className="hint">Ref. mercado: {modalItem.ref_usd ? `$${modalItem.ref_usd} USD` : 'sin dato'}</span>
+              <button className="ghost" style={{ padding: '4px 10px', fontSize: '0.75rem' }} onClick={refreshRefPrice} disabled={modalItem.refreshing}>
+                {modalItem.refreshing ? 'Buscando...' : 'Actualizar'}
+              </button>
+              {modalItem.mode === 'edit' && (
+                <button className="ghost" style={{ padding: '4px 10px', fontSize: '0.75rem' }} onClick={() => loadPriceHistory(modalItem.id)}>Ver historial</button>
+              )}
+            </div>
+
+            {priceHistory === 'loading' && <p className="hint">Cargando historial...</p>}
+            {Array.isArray(priceHistory) && (
+              <div style={{ marginBottom: 14, maxHeight: 140, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8, padding: 10 }}>
+                {priceHistory.length === 0 && <p className="hint" style={{ margin: 0 }}>Sin historial todavía.</p>}
+                {priceHistory.map(s => (
+                  <div key={s.id} className="hint" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span>{new Date(s.recordedAt).toLocaleDateString('es-MX')}</span>
+                    <span>Tú: ${s.myPrice.toFixed(2)} {s.refPrice ? `· Mercado: $${s.refPrice.toFixed(2)}` : ''}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="field"><label>Condición</label>
               <select value={modalItem.condition} onChange={e => setModalItem(m => ({ ...m, condition: e.target.value }))}>
@@ -661,10 +803,16 @@ export default function Admin() {
               <label htmlFor="foilCheck" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}><span className="foil-badge" /> Es versión Foil</label>
             </div>
 
+            <div className="field"><label>Notas internas (solo tú las ves)</label>
+              <textarea value={modalItem.notes} onChange={e => setModalItem(m => ({ ...m, notes: e.target.value }))} rows={2}
+                style={{ width: '100%', background: 'var(--ink2)', border: '1px solid var(--line)', color: 'var(--parchment)', borderRadius: 'var(--radius)', padding: '10px 12px', fontFamily: 'Inter', fontSize: '0.85rem' }}
+                placeholder="ej. Reservada para Juan en persona" />
+            </div>
+
             <div className="field"><label>Link de pago Stripe (opcional)</label><input value={modalItem.stripe_link} onChange={e => setModalItem(m => ({ ...m, stripe_link: e.target.value }))} placeholder="https://buy.stripe.com/..." /></div>
 
             <div className="modal-actions">
-              <button className="ghost" onClick={() => setModalItem(null)}>Cancelar</button>
+              <button className="ghost" onClick={() => { setModalItem(null); setPriceHistory(null); }}>Cancelar</button>
               <button className="primary" onClick={saveModalItem}>Guardar</button>
             </div>
           </div>

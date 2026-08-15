@@ -1,5 +1,7 @@
 import { prisma } from '../../lib/prisma';
 import { checkAdmin } from '../../lib/auth';
+import { getCustomerIdFromReq } from '../../lib/customerAuth';
+import { sendOrderEmails } from '../../lib/sendEmail';
 
 const HOLD_HOURS = 48;
 
@@ -28,10 +30,14 @@ async function recomputeTotal(orderId) {
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
-    const { items, customerName } = req.body;
+    const { items, customerName, customerPhone, customerEmail } = req.body;
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Carrito vacío' });
     }
+
+    const customerId = getCustomerIdFromReq(req);
+    let account = null;
+    if (customerId) account = await prisma.customer.findUnique({ where: { id: customerId } });
 
     const lines = [];
     for (const raw of items) {
@@ -56,11 +62,16 @@ export default async function handler(req, res) {
         status: 'pending',
         expiresAt,
         totalUsd,
-        customerName: customerName || null,
+        customerName: (account?.name) || customerName || null,
+        customerPhone: (account?.phone) || customerPhone || null,
+        customerEmail: (account?.email) || customerEmail || null,
+        customerId: account?.id || null,
         items: { create: lines.map(l => ({ inventoryId: l.id, name: l.name, qty: l.qty, priceUsd: l.priceUsd })) }
       },
       include: { items: true }
     });
+
+    sendOrderEmails(order).catch(() => {});
 
     return res.status(201).json({ order, expiresAt });
   }
