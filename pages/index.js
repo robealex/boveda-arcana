@@ -111,7 +111,7 @@ export default function Home() {
   function CardBadges({ it }) {
     return (
       <>
-        {it.foil && <span title="Foil" style={{ marginRight: 4 }}>🌈</span>}
+        {it.foil && <span className="foil-badge" title="Foil" style={{ marginRight: 4 }} />}
         {it.language && it.language !== 'en' && <span className="hint">{LANGUAGES[it.language] || it.language}</span>}
       </>
     );
@@ -234,7 +234,7 @@ export default function Home() {
         <div className="modal-bg show" onClick={() => setDetailItem(null)}>
           <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
             {detailItem.img && <img src={detailItem.img} alt={detailItem.name} style={{ width: '100%', borderRadius: 8, marginBottom: 14 }} />}
-            <h3 style={{ marginTop: 0, marginBottom: 4 }}>{detailItem.foil ? '🌈 ' : ''}{detailItem.name}</h3>
+            <h3 style={{ marginTop: 0, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>{detailItem.foil && <span className="foil-badge" title="Foil" />}{detailItem.name}</h3>
             <p className="hint" style={{ marginTop: 0 }}>{detailItem.setName} · {detailItem.condition} · {LANGUAGES[detailItem.language] || detailItem.language}</p>
             {detailItem.typeLine && <p style={{ fontSize: '0.85rem', margin: '6px 0' }}>{detailItem.typeLine}</p>}
             <div style={{ display: 'flex', gap: 12, fontSize: '0.8rem', color: 'var(--muted)', marginBottom: 14 }}>

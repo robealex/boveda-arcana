@@ -533,7 +533,7 @@ export default function Admin() {
           <div className="card" key={it.id}>
             <div className="art">{it.img && <img src={it.img} alt={it.name} />}</div>
             <div className="info">
-              <div className="name">{it.name} {it.foil ? '🌈' : ''}</div>
+              <div className="name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{it.name} {it.foil && <span className="foil-badge" title="Foil" />}</div>
               <div className="set">
                 {it.condition} · x{it.rawQty}{it.reserved > 0 ? ` (${it.reserved} apartadas, ${it.qty} libres)` : ''} · {LANGUAGES[it.language] || it.language}
               </div>
@@ -658,7 +658,7 @@ export default function Admin() {
 
             <div className="field" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" id="foilCheck" checked={modalItem.foil} onChange={e => setModalItem(m => ({ ...m, foil: e.target.checked }))} style={{ width: 'auto' }} />
-              <label htmlFor="foilCheck" style={{ margin: 0 }}>🌈 Es versión Foil</label>
+              <label htmlFor="foilCheck" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}><span className="foil-badge" /> Es versión Foil</label>
             </div>
 
             <div className="field"><label>Link de pago Stripe (opcional)</label><input value={modalItem.stripe_link} onChange={e => setModalItem(m => ({ ...m, stripe_link: e.target.value }))} placeholder="https://buy.stripe.com/..." /></div>
