@@ -65,4 +65,20 @@ button.ghost:hover{ border-color:var(--gold); }
   border: 1px solid rgba(255,255,255,0.4);
 }
 
+.hover-thumb-wrap{ position:relative; display:inline-block; }
+.hover-thumb-icon{ width:28px; height:38px; object-fit:cover; border-radius:4px; display:block; border:1px solid var(--line); }
+.hover-thumb-float{
+  display:none; position:absolute; left:36px; top:50%; transform:translateY(-50%);
+  width:180px; border-radius:8px; z-index:100; box-shadow:0 10px 30px rgba(0,0,0,0.6); border:1px solid var(--line);
+}
+.hover-thumb-wrap:hover .hover-thumb-float{ display:block; }
+
+.data-table{ width:100%; border-collapse:collapse; font-size:0.85rem; }
+.data-table th{ text-align:left; color:var(--muted); font-weight:600; padding:8px; border-bottom:1px solid var(--line); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em; }
+.data-table td{ padding:8px; border-bottom:1px solid var(--line); vertical-align:middle; }
+.data-table input, .data-table select{ padding:6px 8px; font-size:0.82rem; }
+.view-toggle{ display:flex; gap:0; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+.view-toggle button{ background:transparent; border:none; color:var(--muted); padding:8px 16px; cursor:pointer; font-size:0.82rem; font-weight:600; }
+.view-toggle button.active{ background:var(--gold); color:var(--ink); }
+
 footer{ text-align:center; color:var(--muted); font-size:0.78rem; padding:30px; border-top:1px solid var(--line); }

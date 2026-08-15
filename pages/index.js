@@ -21,6 +21,7 @@ export default function Home() {
   const [showCheckoutForm, setShowCheckoutForm] = useState(false);
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 20;
+  const [viewMode, setViewMode] = useState('grid');
 
   const MAIN_TYPES = ['Creature', 'Instant', 'Sorcery', 'Artifact', 'Enchantment', 'Land', 'Planeswalker', 'Battle'];
   const COLOR_INFO = { W: 'Blanco', U: 'Azul', B: 'Negro', R: 'Rojo', G: 'Verde', C: 'Incoloro' };
@@ -231,6 +232,14 @@ export default function Home() {
 
         {items.length === 0 && <p className="hint">Todavía no hay cartas publicadas.</p>}
 
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+          <div className="view-toggle">
+            <button className={viewMode === 'grid' ? 'active' : ''} onClick={() => setViewMode('grid')}>🎴 Cuadrícula</button>
+            <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')}>📋 Lista</button>
+          </div>
+        </div>
+
+        {viewMode === 'grid' && (
         <div className="grid">
           {pagedVisible.map(it => {
             const soldOut = it.qty <= 0;
@@ -255,6 +264,48 @@ export default function Home() {
             );
           })}
         </div>
+        )}
+
+        {viewMode === 'list' && (
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th></th><th>Nombre</th><th>Edición</th><th>Condición</th><th>Precio</th><th>Disp.</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {pagedVisible.map(it => {
+                const soldOut = it.qty <= 0;
+                return (
+                  <tr key={it.id} style={{ opacity: soldOut ? 0.5 : 1 }}>
+                    <td>
+                      {it.img && (
+                        <div className="hover-thumb-wrap">
+                          <img className="hover-thumb-icon" src={it.img} alt={it.name} />
+                          <img className="hover-thumb-float" src={it.img} alt={it.name} />
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ cursor: 'pointer' }} onClick={() => setDetailItem(it)}>
+                      <CardBadges it={it} /> {it.name}
+                    </td>
+                    <td className="hint">{it.setName}</td>
+                    <td className="hint">{it.condition}</td>
+                    <td className="mono">{rate ? `$${mxn(Number(it.price)).toFixed(2)} MXN` : '...'}</td>
+                    <td>{soldOut ? <span style={{ color: 'var(--blood)' }}>Agotado</span> : it.qty}</td>
+                    <td>
+                      <button className="ghost" disabled={soldOut} style={soldOut ? { opacity: 0.5 } : {}} onClick={() => addToCart(it)}>
+                        {soldOut ? 'Agotado' : 'Agregar'}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        )}
 
         {visible.length > PAGE_SIZE && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 28 }}>

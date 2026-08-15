@@ -63,6 +63,50 @@ export default function Admin() {
   const pagedItems = sortedItems.slice(invPage * INV_PAGE_SIZE, invPage * INV_PAGE_SIZE + INV_PAGE_SIZE);
   useEffect(() => { setInvPage(0); }, [sortBy, items.length]);
 
+  // ---------- Vista de tabla editable ----------
+  const [invView, setInvView] = useState('cards');
+  const [rowEdits, setRowEdits] = useState({});
+
+  useEffect(() => {
+    if (invView !== 'table') return;
+    const initial = {};
+    pagedItems.forEach(it => {
+      initial[it.id] = { name: it.name, set_name: it.setName || '', price: Number(it.price), qty: it.rawQty, condition: it.condition || 'Near Mint', foil: Boolean(it.foil) };
+    });
+    setRowEdits(initial);
+  }, [invView, invPage, items]);
+
+  function updateRowEdit(id, field, value) {
+    setRowEdits(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
+  }
+
+  function isRowDirty(it) {
+    const e = rowEdits[it.id];
+    if (!e) return false;
+    return e.name !== it.name || e.set_name !== (it.setName || '') || Number(e.price) !== Number(it.price) ||
+      parseInt(e.qty) !== it.rawQty || e.condition !== (it.condition || 'Near Mint') || Boolean(e.foil) !== Boolean(it.foil);
+  }
+
+  const dirtyCount = pagedItems.filter(isRowDirty).length;
+
+  async function saveAllRowEdits() {
+    const dirty = pagedItems.filter(isRowDirty);
+    if (dirty.length === 0) return;
+    setImporting(true);
+    for (const it of dirty) {
+      const e = rowEdits[it.id];
+      await fetch(`/api/inventory?id=${it.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
+        body: JSON.stringify({ name: e.name, set_name: e.set_name, price: parseFloat(e.price), qty: parseInt(e.qty), condition: e.condition, foil: e.foil })
+      });
+    }
+    setImporting(false);
+    loadInventory();
+    alert(`Se guardaron ${dirty.length} carta(s).`);
+  }
+
+
   useEffect(() => {
     fetch('/api/exchange-rate').then(r => r.json()).then(d => setRate(d.rate));
   }, []);
@@ -595,15 +639,23 @@ export default function Admin() {
       )}
       {results.length <= RESULTS_PER_PAGE && <div style={{ marginBottom: 40 }} />}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, flexWrap: 'wrap', gap: 10 }}>
         <h3 style={{ margin: 0 }}>Inventario actual ({items.length})</h3>
-        <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ width: 220 }}>
-          <option value="newest">Más nuevas primero</option>
-          <option value="name">Nombre (A-Z)</option>
-          <option value="price_asc">Precio: menor a mayor</option>
-          <option value="price_desc">Precio: mayor a menor</option>
-        </select>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ width: 200 }}>
+            <option value="newest">Más nuevas primero</option>
+            <option value="name">Nombre (A-Z)</option>
+            <option value="price_asc">Precio: menor a mayor</option>
+            <option value="price_desc">Precio: mayor a menor</option>
+          </select>
+          <div className="view-toggle">
+            <button className={invView === 'cards' ? 'active' : ''} onClick={() => setInvView('cards')}>🎴 Tarjetas</button>
+            <button className={invView === 'table' ? 'active' : ''} onClick={() => setInvView('table')}>📋 Tabla</button>
+          </div>
+        </div>
       </div>
+
+      {invView === 'cards' && (
       <div className="grid" style={{ marginTop: 16 }}>
         {pagedItems.map(it => (
           <div className="card" key={it.id}>
@@ -625,6 +677,58 @@ export default function Admin() {
           </div>
         ))}
       </div>
+      )}
+
+      {invView === 'table' && (
+        <div>
+          <p className="hint" style={{ marginTop: 12 }}>Edita directo en la tabla y dale "Guardar cambios" al final. Si cambias de página sin guardar, se pierden los cambios de esta página.</p>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th></th><th>Nombre</th><th>Edición</th><th>Precio USD</th><th>Cant.</th><th>Condición</th><th>Foil</th><th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagedItems.map(it => {
+                  const e = rowEdits[it.id] || {};
+                  const dirty = isRowDirty(it);
+                  return (
+                    <tr key={it.id} style={dirty ? { background: 'rgba(201,162,39,0.06)' } : {}}>
+                      <td>
+                        {it.img && (
+                          <div className="hover-thumb-wrap">
+                            <img className="hover-thumb-icon" src={it.img} alt={it.name} />
+                            <img className="hover-thumb-float" src={it.img} alt={it.name} />
+                          </div>
+                        )}
+                      </td>
+                      <td><input value={e.name ?? ''} onChange={ev => updateRowEdit(it.id, 'name', ev.target.value)} style={{ minWidth: 160 }} /></td>
+                      <td><input value={e.set_name ?? ''} onChange={ev => updateRowEdit(it.id, 'set_name', ev.target.value)} style={{ minWidth: 130 }} /></td>
+                      <td><input type="number" value={e.price ?? ''} onChange={ev => updateRowEdit(it.id, 'price', ev.target.value)} style={{ width: 80 }} /></td>
+                      <td><input type="number" value={e.qty ?? ''} onChange={ev => updateRowEdit(it.id, 'qty', ev.target.value)} style={{ width: 60 }} /></td>
+                      <td>
+                        <select value={e.condition ?? 'Near Mint'} onChange={ev => updateRowEdit(it.id, 'condition', ev.target.value)}>
+                          <option>Near Mint</option><option>Lightly Played</option><option>Moderately Played</option><option>Heavily Played</option><option>Damaged</option>
+                        </select>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <input type="checkbox" checked={Boolean(e.foil)} onChange={ev => updateRowEdit(it.id, 'foil', ev.target.checked)} style={{ width: 'auto' }} />
+                      </td>
+                      <td>{dirty && <span className="hint" style={{ color: 'var(--gold)' }}>sin guardar</span>}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 16, position: 'sticky', bottom: 12 }}>
+            <button className="primary" onClick={saveAllRowEdits} disabled={dirtyCount === 0 || importing}>
+              {importing ? 'Guardando...' : `Guardar cambios (${dirtyCount})`}
+            </button>
+          </div>
+        </div>
+      )}
 
       {sortedItems.length > INV_PAGE_SIZE && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 20 }}>
