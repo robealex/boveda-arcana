@@ -57,6 +57,12 @@ export default function Admin() {
     return new Date(b.createdAt) - new Date(a.createdAt);
   });
 
+  const INV_PAGE_SIZE = 20;
+  const [invPage, setInvPage] = useState(0);
+  const totalInvPages = Math.max(1, Math.ceil(sortedItems.length / INV_PAGE_SIZE));
+  const pagedItems = sortedItems.slice(invPage * INV_PAGE_SIZE, invPage * INV_PAGE_SIZE + INV_PAGE_SIZE);
+  useEffect(() => { setInvPage(0); }, [sortBy, items.length]);
+
   useEffect(() => {
     fetch('/api/exchange-rate').then(r => r.json()).then(d => setRate(d.rate));
   }, []);
@@ -599,7 +605,7 @@ export default function Admin() {
         </select>
       </div>
       <div className="grid" style={{ marginTop: 16 }}>
-        {sortedItems.map(it => (
+        {pagedItems.map(it => (
           <div className="card" key={it.id}>
             <div className="art">{it.img && <img src={it.img} alt={it.name} />}</div>
             <div className="info">
@@ -619,8 +625,28 @@ export default function Admin() {
           </div>
         ))}
       </div>
+
+      {sortedItems.length > INV_PAGE_SIZE && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 20 }}>
+          <button className="ghost" onClick={() => setInvPage(p => Math.max(0, p - 1))} disabled={invPage === 0}>←</button>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', maxWidth: 400, justifyContent: 'center' }}>
+            {Array.from({ length: totalInvPages }).map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setInvPage(i)}
+                style={{
+                  width: 9, height: 9, borderRadius: '50%', border: 'none', cursor: 'pointer', padding: 0,
+                  background: i === invPage ? 'var(--gold)' : 'var(--line)'
+                }}
+              />
+            ))}
+          </div>
+          <button className="ghost" onClick={() => setInvPage(p => Math.min(totalInvPages - 1, p + 1))} disabled={invPage === totalInvPages - 1}>→</button>
+        </div>
+      )}
       </>
       )}
+
 
       {view === 'orders' && (
         <div>
