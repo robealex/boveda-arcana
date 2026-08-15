@@ -21,6 +21,25 @@ async function getReservedMap() {
   return new Map(rows.map(r => [r.inventoryId, r._sum.qty || 0]));
 }
 
+function buildData(body) {
+  const { name, set_name, img, price, qty, condition, stripe_link, colors, rarity, type_line, foil, language, scryfall_uri } = body;
+  const data = {};
+  if (name !== undefined) data.name = name;
+  if (set_name !== undefined) data.setName = set_name || '';
+  if (img !== undefined) data.img = img || '';
+  if (price !== undefined) data.price = price;
+  if (qty !== undefined) data.qty = qty;
+  if (condition !== undefined) data.condition = condition || 'Near Mint';
+  if (stripe_link !== undefined) data.stripeLink = stripe_link || '';
+  if (colors !== undefined) data.colors = colors || '';
+  if (rarity !== undefined) data.rarity = rarity || '';
+  if (type_line !== undefined) data.typeLine = type_line || '';
+  if (foil !== undefined) data.foil = Boolean(foil);
+  if (language !== undefined) data.language = language || 'en';
+  if (scryfall_uri !== undefined) data.scryfallUri = scryfall_uri || '';
+  return data;
+}
+
 export default async function handler(req, res) {
   if (req.method === 'GET') {
     const [items, reservedMap] = await Promise.all([
@@ -32,22 +51,11 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     if (!checkAdmin(req)) return res.status(401).json({ error: 'Password de administrador incorrecto' });
-    const { name, set_name, img, price, qty, condition, stripe_link, colors, rarity, type_line } = req.body;
-    if (!name || !price) return res.status(400).json({ error: 'Faltan datos: nombre y precio son obligatorios' });
-    const item = await prisma.inventory.create({
-      data: {
-        name,
-        setName: set_name || '',
-        img: img || '',
-        price,
-        qty: qty || 1,
-        condition: condition || 'Near Mint',
-        stripeLink: stripe_link || '',
-        colors: colors || '',
-        rarity: rarity || '',
-        typeLine: type_line || ''
-      }
-    });
+    if (!req.body.name || !req.body.price) return res.status(400).json({ error: 'Faltan datos: nombre y precio son obligatorios' });
+    const data = buildData(req.body);
+    data.qty = data.qty || 1;
+    data.condition = data.condition || 'Near Mint';
+    const item = await prisma.inventory.create({ data });
     return res.status(201).json({ item: serialize(item) });
   }
 
@@ -66,12 +74,8 @@ export default async function handler(req, res) {
   if (req.method === 'PATCH') {
     if (!checkAdmin(req)) return res.status(401).json({ error: 'Password de administrador incorrecto' });
     const { id } = req.query;
-    const { qty, price, condition } = req.body;
     if (!id) return res.status(400).json({ error: 'Falta id' });
-    const data = {};
-    if (qty !== undefined) data.qty = qty;
-    if (price !== undefined) data.price = price;
-    if (condition !== undefined) data.condition = condition;
+    const data = buildData(req.body);
     const item = await prisma.inventory.update({ where: { id: parseInt(id) }, data });
     return res.status(200).json({ item: serialize(item) });
   }

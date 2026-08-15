@@ -3,19 +3,32 @@ import { checkAdmin } from '../../lib/auth';
 
 const HOLD_HOURS = 48;
 
-async function getAvailable(inventoryId) {
+async function getAvailable(inventoryId, excludeOrderId) {
   const item = await prisma.inventory.findUnique({ where: { id: inventoryId } });
   if (!item) return { item: null, available: 0 };
   const reserved = await prisma.orderItem.aggregate({
-    where: { inventoryId, order: { status: 'pending', expiresAt: { gt: new Date() } } },
+    where: {
+      inventoryId,
+      order: {
+        status: 'pending',
+        expiresAt: { gt: new Date() },
+        ...(excludeOrderId ? { id: { not: excludeOrderId } } : {})
+      }
+    },
     _sum: { qty: true }
   });
   return { item, available: Math.max(0, item.qty - (reserved._sum.qty || 0)) };
 }
 
+async function recomputeTotal(orderId) {
+  const items = await prisma.orderItem.findMany({ where: { orderId } });
+  const totalUsd = items.reduce((s, it) => s + Number(it.priceUsd) * it.qty, 0);
+  await prisma.order.update({ where: { id: orderId }, data: { totalUsd } });
+}
+
 export default async function handler(req, res) {
   if (req.method === 'POST') {
-    const { items } = req.body;
+    const { items, customerName } = req.body;
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Carrito vacío' });
     }
@@ -43,6 +56,7 @@ export default async function handler(req, res) {
         status: 'pending',
         expiresAt,
         totalUsd,
+        customerName: customerName || null,
         items: { create: lines.map(l => ({ inventoryId: l.id, name: l.name, qty: l.qty, priceUsd: l.priceUsd })) }
       },
       include: { items: true }
@@ -63,30 +77,58 @@ export default async function handler(req, res) {
   if (req.method === 'PATCH') {
     if (!checkAdmin(req)) return res.status(401).json({ error: 'Password de administrador incorrecto' });
     const { id } = req.query;
-    const { status } = req.body;
-    if (!id || !['confirmed', 'cancelled'].includes(status)) {
-      return res.status(400).json({ error: 'Datos inválidos' });
-    }
-    const order = await prisma.order.findUnique({ where: { id: parseInt(id) }, include: { items: true } });
+    const orderId = parseInt(id);
+    if (!orderId) return res.status(400).json({ error: 'Falta id' });
+    const { status, action, inventoryId, qty, orderItemId } = req.body;
+
+    const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
     if (!order) return res.status(404).json({ error: 'Pedido no encontrado' });
-    if (order.status !== 'pending') return res.status(400).json({ error: 'Este pedido ya fue procesado' });
 
-    if (status === 'confirmed') {
-      const stillExisting = order.items.filter(it => it.inventoryId !== null);
-      await prisma.$transaction([
-        ...stillExisting.map(it =>
-          prisma.inventory.update({
-            where: { id: it.inventoryId },
-            data: { qty: { decrement: it.qty } }
-          })
-        ),
-        prisma.order.update({ where: { id: order.id }, data: { status: 'confirmed' } })
-      ]);
-    } else {
-      await prisma.order.update({ where: { id: order.id }, data: { status: 'cancelled' } });
+    // Cambiar estado (confirmar / cancelar)
+    if (status) {
+      if (!['confirmed', 'cancelled'].includes(status)) return res.status(400).json({ error: 'Estado inválido' });
+      if (order.status !== 'pending') return res.status(400).json({ error: 'Este pedido ya fue procesado' });
+
+      if (status === 'confirmed') {
+        const stillExisting = order.items.filter(it => it.inventoryId !== null);
+        await prisma.$transaction([
+          ...stillExisting.map(it =>
+            prisma.inventory.update({ where: { id: it.inventoryId }, data: { qty: { decrement: it.qty } } })
+          ),
+          prisma.order.update({ where: { id: order.id }, data: { status: 'confirmed' } })
+        ]);
+      } else {
+        await prisma.order.update({ where: { id: order.id }, data: { status: 'cancelled' } });
+      }
+      return res.status(200).json({ ok: true });
     }
 
-    return res.status(200).json({ ok: true });
+    // Editar cartas del pedido (solo si sigue pendiente)
+    if (order.status !== 'pending') return res.status(400).json({ error: 'Este pedido ya fue procesado, no se puede editar' });
+
+    if (action === 'remove_item') {
+      const target = order.items.find(it => it.id === parseInt(orderItemId));
+      if (!target) return res.status(404).json({ error: 'Esa carta no está en el pedido' });
+      await prisma.orderItem.delete({ where: { id: target.id } });
+      await recomputeTotal(orderId);
+      return res.status(200).json({ ok: true });
+    }
+
+    if (action === 'add_item') {
+      const invId = parseInt(inventoryId);
+      const wanted = parseInt(qty);
+      if (!invId || !wanted || wanted <= 0) return res.status(400).json({ error: 'Datos inválidos' });
+      const { item, available } = await getAvailable(invId, orderId);
+      if (!item) return res.status(400).json({ error: 'Esa carta ya no existe en el inventario' });
+      if (available < wanted) return res.status(409).json({ error: `Solo quedan ${available} disponibles de "${item.name}".` });
+      await prisma.orderItem.create({
+        data: { orderId, inventoryId: invId, name: item.name, qty: wanted, priceUsd: item.price }
+      });
+      await recomputeTotal(orderId);
+      return res.status(200).json({ ok: true });
+    }
+
+    return res.status(400).json({ error: 'Acción no reconocida' });
   }
 
   res.status(405).json({ error: 'Método no permitido' });

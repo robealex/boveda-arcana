@@ -93,22 +93,57 @@ export default function Admin() {
     await runSearch(q);
   }
 
-  async function addFromSearch(card) {
-    const refText = card.usd ? `(ref. Scryfall: $${card.usd} USD)` : '(sin precio de referencia)';
-    const price = prompt(`Precio de venta en USD para "${card.name}" ${refText}:`, card.usd || '');
-    if (!price || isNaN(parseFloat(price))) return;
-    const qty = prompt('Cantidad disponible:', '1') || '1';
-    const condition = prompt('Condición (Near Mint / Lightly Played / etc.):', 'Near Mint') || 'Near Mint';
-    await saveItem({ name: card.name, set_name: card.set_name, img: card.img, price: parseFloat(price), qty: parseInt(qty), condition, colors: card.colors, rarity: card.rarity, type_line: card.type_line });
+  // ---------- Modal de agregar/editar carta ----------
+  const LANGUAGES = { en: 'Inglés', es: 'Español', ja: 'Japonés', de: 'Alemán', fr: 'Francés', it: 'Italiano', pt: 'Portugués', ru: 'Ruso', ko: 'Coreano', zhs: 'Chino simpl.', zht: 'Chino trad.' };
+  const [modalItem, setModalItem] = useState(null);
+
+  function openAddModal(card) {
+    setModalItem({
+      mode: 'add',
+      name: card.name, set_name: card.set_name || '', img: card.img || '',
+      price: card.usd || '', qty: 1, condition: 'Near Mint',
+      colors: (card.colors || '').split(',').filter(Boolean),
+      rarity: card.rarity || '', type_line: card.type_line || '',
+      foil: Boolean(card.foil), language: card.lang || 'en',
+      stripe_link: '', scryfall_uri: card.scryfall_uri || ''
+    });
   }
 
-  async function saveItem(payload) {
-    const r = await fetch('/api/inventory', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
+  function openEditModal(it) {
+    setModalItem({
+      mode: 'edit', id: it.id,
+      name: it.name, set_name: it.setName || '', img: it.img || '',
+      price: Number(it.price), qty: it.rawQty, condition: it.condition || 'Near Mint',
+      colors: (it.colors || '').split(',').filter(Boolean),
+      rarity: it.rarity || '', type_line: it.typeLine || '',
+      foil: Boolean(it.foil), language: it.language || 'en',
+      stripe_link: it.stripeLink || '', scryfall_uri: it.scryfallUri || ''
+    });
+  }
+
+  function toggleModalColor(c) {
+    setModalItem(m => ({ ...m, colors: m.colors.includes(c) ? m.colors.filter(x => x !== c) : [...m.colors, c] }));
+  }
+
+  async function saveModalItem() {
+    const m = modalItem;
+    if (!m.name.trim()) { alert('Ponle nombre a la carta.'); return; }
+    if (m.price === '' || isNaN(parseFloat(m.price))) { alert('Precio inválido.'); return; }
+    if (isNaN(parseInt(m.qty))) { alert('Cantidad inválida.'); return; }
+    const payload = {
+      name: m.name.trim(), set_name: m.set_name, img: m.img,
+      price: parseFloat(m.price), qty: parseInt(m.qty), condition: m.condition,
+      colors: m.colors.join(','), rarity: m.rarity, type_line: m.type_line,
+      foil: m.foil, language: m.language, stripe_link: m.stripe_link, scryfall_uri: m.scryfall_uri
+    };
+    const url = m.mode === 'edit' ? `/api/inventory?id=${m.id}` : '/api/inventory';
+    const method = m.mode === 'edit' ? 'PATCH' : 'POST';
+    const r = await fetch(url, {
+      method, headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
       body: JSON.stringify(payload)
     });
     if (!r.ok) { const d = await r.json(); alert(d.error || 'Error al guardar'); return; }
+    setModalItem(null);
     loadInventory();
   }
 
@@ -116,23 +151,6 @@ export default function Admin() {
     if (!confirm('¿Eliminar esta carta del inventario?')) return;
     const r = await fetch(`/api/inventory?id=${id}`, { method: 'DELETE', headers: { 'x-admin-password': pw } });
     if (!r.ok) { const d = await r.json(); alert(d.error || 'Error al eliminar'); return; }
-    loadInventory();
-  }
-
-  async function editItem(it) {
-    const price = prompt(`Nuevo precio en USD para "${it.name}":`, Number(it.price).toFixed(2));
-    if (price === null) return;
-    const qty = prompt('Nueva cantidad TOTAL en tu posesión (sin restar apartados):', it.rawQty);
-    if (qty === null) return;
-    const condition = prompt('Nueva condición:', it.condition || 'Near Mint');
-    if (condition === null) return;
-    if (isNaN(parseFloat(price)) || isNaN(parseInt(qty))) { alert('Precio o cantidad inválidos.'); return; }
-    const r = await fetch(`/api/inventory?id=${it.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
-      body: JSON.stringify({ price: parseFloat(price), qty: parseInt(qty), condition })
-    });
-    if (!r.ok) { const d = await r.json(); alert(d.error || 'Error al actualizar'); return; }
     loadInventory();
   }
 
@@ -170,6 +188,32 @@ export default function Admin() {
     const h = Math.floor(ms / 3600000);
     const m = Math.floor((ms % 3600000) / 60000);
     return `${h}h ${m}m restantes`;
+  }
+
+  const [editingOrder, setEditingOrder] = useState(null);
+  const [addToOrderId, setAddToOrderId] = useState('');
+  const [addToOrderQty, setAddToOrderQty] = useState(1);
+
+  async function removeOrderItem(orderId, orderItemId) {
+    const r = await fetch(`/api/orders?id=${orderId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
+      body: JSON.stringify({ action: 'remove_item', orderItemId })
+    });
+    if (!r.ok) { const d = await r.json(); alert(d.error || 'Error al quitar la carta'); return; }
+    loadOrders();
+  }
+
+  async function addOrderItem(orderId) {
+    if (!addToOrderId) { alert('Selecciona una carta.'); return; }
+    const r = await fetch(`/api/orders?id=${orderId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
+      body: JSON.stringify({ action: 'add_item', inventoryId: addToOrderId, qty: addToOrderQty })
+    });
+    if (!r.ok) { const d = await r.json(); alert(d.error || 'Error al agregar la carta'); return; }
+    setAddToOrderId(''); setAddToOrderQty(1);
+    loadOrders();
   }
 
   // ---------- Importar CSV ----------
@@ -275,7 +319,8 @@ export default function Admin() {
         body: JSON.stringify({
           name: r.data.name, set_name: r.data.set_name, img: r.data.img,
           price: parseFloat(r.price), qty: r.qty, condition: r.condition,
-          colors: r.data.colors, rarity: r.data.rarity, type_line: r.data.type_line
+          colors: r.data.colors, rarity: r.data.rarity, type_line: r.data.type_line,
+          foil: r.data.foil, language: r.data.lang, scryfall_uri: r.data.scryfall_uri
         })
       });
     }
@@ -448,7 +493,7 @@ export default function Admin() {
               <div className="name">{c.name}</div>
               <div className="set">{c.set_name}</div>
               <div className="price mono">{c.usd ? `$${c.usd} USD ref.` : 'Sin precio ref.'}</div>
-              <button className="ghost" onClick={() => addFromSearch(c)}>Agregar a inventario</button>
+              <button className="ghost" onClick={() => openAddModal(c)}>Agregar a inventario</button>
             </div>
           </div>
         ))}
@@ -488,13 +533,13 @@ export default function Admin() {
           <div className="card" key={it.id}>
             <div className="art">{it.img && <img src={it.img} alt={it.name} />}</div>
             <div className="info">
-              <div className="name">{it.name}</div>
+              <div className="name">{it.name} {it.foil ? '🌈' : ''}</div>
               <div className="set">
-                {it.condition} · x{it.rawQty}{it.reserved > 0 ? ` (${it.reserved} apartadas, ${it.qty} libres)` : ''}
+                {it.condition} · x{it.rawQty}{it.reserved > 0 ? ` (${it.reserved} apartadas, ${it.qty} libres)` : ''} · {LANGUAGES[it.language] || it.language}
               </div>
               <div className="price mono">${Number(it.price).toFixed(2)} USD{rate ? ` · ≈$${(Number(it.price) * rate).toFixed(2)} MXN` : ''}</div>
               <div className="row" style={{ display: 'flex', gap: 8 }}>
-                <button className="ghost" style={{ flex: 1 }} onClick={() => editItem(it)}>Editar</button>
+                <button className="ghost" style={{ flex: 1 }} onClick={() => openEditModal(it)}>Editar</button>
                 <button className="ghost" style={{ flex: 1 }} onClick={() => deleteItem(it.id)}>Eliminar</button>
               </div>
             </div>
@@ -517,6 +562,7 @@ export default function Admin() {
                   <div>
                     <span style={{ color: badgeColor, fontWeight: 700, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{st}</span>
                     <span className="hint" style={{ marginLeft: 10 }}>Pedido #{o.id} · {new Date(o.createdAt).toLocaleString('es-MX')}</span>
+                    {o.customerName && <div style={{ fontSize: '0.85rem', marginTop: 2 }}>Cliente: <strong>{o.customerName}</strong></div>}
                   </div>
                   {o.status === 'pending' && st !== 'Vencido' && (
                     <span className="hint">{timeLeft(o.expiresAt)}</span>
@@ -526,19 +572,102 @@ export default function Admin() {
                   {o.items.map(it => (
                     <li key={it.id} className="hint" style={{ color: 'var(--parchment)' }}>
                       {it.name} x{it.qty} — ${Number(it.priceUsd).toFixed(2)} USD c/u
+                      {o.status === 'pending' && editingOrder === o.id && (
+                        <button className="ghost" style={{ marginLeft: 8, padding: '2px 8px', fontSize: '0.72rem' }} onClick={() => removeOrderItem(o.id, it.id)}>Quitar</button>
+                      )}
                     </li>
                   ))}
                 </ul>
                 <div className="mono" style={{ color: 'var(--gold)', marginBottom: 10 }}>Total: ${Number(o.totalUsd).toFixed(2)} USD</div>
+
+                {o.status === 'pending' && editingOrder === o.id && (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+                    <select value={addToOrderId} onChange={e => setAddToOrderId(e.target.value)} style={{ maxWidth: 220 }}>
+                      <option value="">Agregar carta del inventario...</option>
+                      {items.filter(it => it.qty > 0).map(it => <option key={it.id} value={it.id}>{it.name} (x{it.qty} libres)</option>)}
+                    </select>
+                    <input type="number" value={addToOrderQty} onChange={e => setAddToOrderQty(parseInt(e.target.value) || 1)} style={{ width: 60 }} min="1" />
+                    <button className="ghost" onClick={() => addOrderItem(o.id)}>Agregar</button>
+                  </div>
+                )}
+
                 {(o.status === 'pending') && (
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button className="primary" onClick={() => setOrderStatus(o.id, 'confirmed')}>Confirmar venta</button>
                     <button className="ghost" onClick={() => setOrderStatus(o.id, 'cancelled')}>Cancelar</button>
+                    <button className="ghost" onClick={() => setEditingOrder(editingOrder === o.id ? null : o.id)}>
+                      {editingOrder === o.id ? 'Listo' : 'Editar pedido'}
+                    </button>
                   </div>
                 )}
               </div>
             );
           })}
+        </div>
+      )}
+      {modalItem && (
+        <div className="modal-bg show">
+          <div className="modal" style={{ maxWidth: 480, maxHeight: '85vh', overflowY: 'auto' }}>
+            <h3 style={{ marginTop: 0 }}>{modalItem.mode === 'edit' ? 'Editar carta' : 'Agregar carta'}</h3>
+
+            {modalItem.img && <img src={modalItem.img} alt={modalItem.name} style={{ width: 100, borderRadius: 6, marginBottom: 12 }} />}
+
+            <div className="field"><label>Nombre</label><input value={modalItem.name} onChange={e => setModalItem(m => ({ ...m, name: e.target.value }))} /></div>
+            <div className="field"><label>Edición / set</label><input value={modalItem.set_name} onChange={e => setModalItem(m => ({ ...m, set_name: e.target.value }))} /></div>
+            <div className="field"><label>URL de imagen</label><input value={modalItem.img} onChange={e => setModalItem(m => ({ ...m, img: e.target.value }))} /></div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div className="field" style={{ flex: 1 }}><label>Precio (USD)</label><input type="number" value={modalItem.price} onChange={e => setModalItem(m => ({ ...m, price: e.target.value }))} /></div>
+              <div className="field" style={{ flex: 1 }}><label>Cantidad</label><input type="number" value={modalItem.qty} onChange={e => setModalItem(m => ({ ...m, qty: e.target.value }))} /></div>
+            </div>
+
+            <div className="field"><label>Condición</label>
+              <select value={modalItem.condition} onChange={e => setModalItem(m => ({ ...m, condition: e.target.value }))}>
+                <option>Near Mint</option><option>Lightly Played</option><option>Moderately Played</option><option>Heavily Played</option><option>Damaged</option>
+              </select>
+            </div>
+
+            <div className="field"><label>Rareza</label>
+              <select value={modalItem.rarity} onChange={e => setModalItem(m => ({ ...m, rarity: e.target.value }))}>
+                <option value="">Sin especificar</option>
+                <option value="common">Common</option><option value="uncommon">Uncommon</option>
+                <option value="rare">Rare</option><option value="mythic">Mythic</option>
+              </select>
+            </div>
+
+            <div className="field"><label>Tipo</label><input value={modalItem.type_line} onChange={e => setModalItem(m => ({ ...m, type_line: e.target.value }))} placeholder="ej. Creature — Human Wizard" /></div>
+
+            <div className="field"><label>Idioma</label>
+              <select value={modalItem.language} onChange={e => setModalItem(m => ({ ...m, language: e.target.value }))}>
+                {Object.entries(LANGUAGES).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+              </select>
+            </div>
+
+            <label>Colores</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '6px 0 14px' }}>
+              {Object.entries({ W: 'W', U: 'U', B: 'B', R: 'R', G: 'G' }).map(([code]) => (
+                <button key={code} className="ghost" onClick={() => toggleModalColor(code)}
+                  style={{
+                    width: 34, padding: '6px 0',
+                    borderColor: modalItem.colors.includes(code) ? 'var(--gold)' : 'var(--line)',
+                    background: modalItem.colors.includes(code) ? 'rgba(201,162,39,0.12)' : 'transparent',
+                    color: modalItem.colors.includes(code) ? 'var(--gold)' : 'var(--parchment)'
+                  }}>{code}</button>
+              ))}
+            </div>
+
+            <div className="field" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="checkbox" id="foilCheck" checked={modalItem.foil} onChange={e => setModalItem(m => ({ ...m, foil: e.target.checked }))} style={{ width: 'auto' }} />
+              <label htmlFor="foilCheck" style={{ margin: 0 }}>🌈 Es versión Foil</label>
+            </div>
+
+            <div className="field"><label>Link de pago Stripe (opcional)</label><input value={modalItem.stripe_link} onChange={e => setModalItem(m => ({ ...m, stripe_link: e.target.value }))} placeholder="https://buy.stripe.com/..." /></div>
+
+            <div className="modal-actions">
+              <button className="ghost" onClick={() => setModalItem(null)}>Cancelar</button>
+              <button className="primary" onClick={saveModalItem}>Guardar</button>
+            </div>
+          </div>
         </div>
       )}
     </main>

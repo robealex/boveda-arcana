@@ -8,30 +8,34 @@ datasource db {
 }
 
 model Inventory {
-  id         Int      @id @default(autoincrement())
-  name       String
-  setName    String?  @map("set_name")
-  img        String?
-  price      Decimal
-  qty        Int      @default(1)
-  condition  String?
-  stripeLink String?  @map("stripe_link")
-  colors     String?
-  rarity     String?
-  typeLine   String?  @map("type_line")
-  createdAt  DateTime @default(now()) @map("created_at")
-  orderItems OrderItem[]
+  id          Int      @id @default(autoincrement())
+  name        String
+  setName     String?  @map("set_name")
+  img         String?
+  price       Decimal
+  qty         Int      @default(1)
+  condition   String?
+  stripeLink  String?  @map("stripe_link")
+  colors      String?
+  rarity      String?
+  typeLine    String?  @map("type_line")
+  foil        Boolean  @default(false)
+  language    String   @default("en")
+  scryfallUri String?  @map("scryfall_uri")
+  createdAt   DateTime @default(now()) @map("created_at")
+  orderItems  OrderItem[]
 
   @@map("inventory")
 }
 
 model Order {
-  id        Int         @id @default(autoincrement())
-  status    String      @default("pending") // pending | confirmed | cancelled
-  expiresAt DateTime    @map("expires_at")
-  totalUsd  Decimal     @map("total_usd")
-  createdAt DateTime    @default(now()) @map("created_at")
-  items     OrderItem[]
+  id           Int         @id @default(autoincrement())
+  status       String      @default("pending") // pending | confirmed | cancelled
+  expiresAt    DateTime    @map("expires_at")
+  totalUsd     Decimal     @map("total_usd")
+  customerName String?     @map("customer_name")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  items        OrderItem[]
 
   @@map("orders")
 }

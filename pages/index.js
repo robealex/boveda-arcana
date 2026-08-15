@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '';
 const SHOP_OWNER = process.env.NEXT_PUBLIC_SHOP_OWNER || '';
+const LANGUAGES = { en: 'Inglés', es: 'Español', ja: 'Japonés', de: 'Alemán', fr: 'Francés', it: 'Italiano', pt: 'Portugués', ru: 'Ruso', ko: 'Coreano', zhs: 'Chino simpl.', zht: 'Chino trad.' };
 
 export default function Home() {
   const [items, setItems] = useState([]);
@@ -13,6 +14,7 @@ export default function Home() {
   const [colorFilter, setColorFilter] = useState([]);
   const [rarityFilter, setRarityFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [detailItem, setDetailItem] = useState(null);
 
   const MAIN_TYPES = ['Creature', 'Instant', 'Sorcery', 'Artifact', 'Enchantment', 'Land', 'Planeswalker', 'Battle'];
   const COLOR_INFO = { W: 'Blanco', U: 'Azul', B: 'Negro', R: 'Rojo', G: 'Verde', C: 'Incoloro' };
@@ -21,13 +23,17 @@ export default function Home() {
     setColorFilter(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
   }
 
-  useEffect(() => {
+  function loadInventory() {
     fetch('/api/inventory').then(r => r.json()).then(d => setItems(d.items || []));
+  }
+
+  useEffect(() => {
+    loadInventory();
     fetch('/api/exchange-rate').then(r => r.json()).then(d => setRate(d.rate));
   }, []);
 
   const visible = items
-    .filter(it => it.qty > 0 && it.name.toLowerCase().includes(filter.toLowerCase()))
+    .filter(it => it.name.toLowerCase().includes(filter.toLowerCase()))
     .filter(it => {
       if (colorFilter.length === 0) return true;
       const cardColors = (it.colors || '').split(',').filter(Boolean);
@@ -50,13 +56,14 @@ export default function Home() {
   }
 
   function addToCart(it) {
+    if (it.qty <= 0) return;
     setCart(prev => {
       const existing = prev.find(c => c.id === it.id);
       if (existing) {
         if (existing.qty < it.qty) return prev.map(c => c.id === it.id ? { ...c, qty: c.qty + 1 } : c);
         return prev;
       }
-      return [...prev, { id: it.id, name: it.name, priceUsd: Number(it.price), img: it.img, qty: 1, max: it.qty, stripe_link: it.stripe_link }];
+      return [...prev, { id: it.id, name: it.name, priceUsd: Number(it.price), img: it.img, qty: 1, max: it.qty, stripe_link: it.stripeLink }];
     });
     setCartOpen(true);
   }
@@ -72,11 +79,14 @@ export default function Home() {
 
   async function checkoutWhatsapp() {
     if (!WA_NUMBER) { alert('El vendedor todavía no configuró su número de WhatsApp (NEXT_PUBLIC_WHATSAPP_NUMBER).'); return; }
+    const customerName = prompt('¿Cuál es tu nombre? (para que el vendedor sepa quién hace el pedido)');
+    if (customerName === null) return;
+
     try {
       const r = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: cart.map(c => ({ id: c.id, qty: c.qty })) })
+        body: JSON.stringify({ items: cart.map(c => ({ id: c.id, qty: c.qty })), customerName: customerName.trim() || null })
       });
       const d = await r.json();
       if (!r.ok) { alert(d.error || 'No se pudo apartar el pedido, intenta de nuevo.'); return; }
@@ -89,12 +99,22 @@ export default function Home() {
       const lineMxn = mxn(c.priceUsd * c.qty);
       return `• ${c.name} x${c.qty} — $${lineMxn ? lineMxn.toFixed(2) : '?'} MXN`;
     }).join('%0A');
-    const msg = `Hola! Quiero comprar estas cartas de Bóveda Arcana:%0A${lines}%0A%0ATotal: $${totalMxn ? totalMxn.toFixed(2) : '?'} MXN`;
+    const nameLine = customerName.trim() ? `Mi nombre: ${customerName.trim()}%0A` : '';
+    const msg = `Hola! Quiero comprar estas cartas de Bóveda Arcana:%0A${nameLine}${lines}%0A%0ATotal: $${totalMxn ? totalMxn.toFixed(2) : '?'} MXN`;
     window.open(`https://wa.me/${WA_NUMBER}?text=${msg}`, '_blank');
 
     setCart([]);
     setCartOpen(false);
-    fetch('/api/inventory').then(r => r.json()).then(d => setItems(d.items || []));
+    loadInventory();
+  }
+
+  function CardBadges({ it }) {
+    return (
+      <>
+        {it.foil && <span title="Foil" style={{ marginRight: 4 }}>🌈</span>}
+        {it.language && it.language !== 'en' && <span className="hint">{LANGUAGES[it.language] || it.language}</span>}
+      </>
+    );
   }
 
   return (
@@ -152,19 +172,24 @@ export default function Home() {
         {items.length === 0 && <p className="hint">Todavía no hay cartas publicadas.</p>}
 
         <div className="grid">
-          {visible.map(it => (
-            <div className="card" key={it.id}>
-              <div className="art">{it.img && <img src={it.img} alt={it.name} />}</div>
-              <div className="info">
-                {it.qty <= 2 && <span className="badge">Últimas {it.qty}</span>}
-                <div className="name">{it.name}</div>
-                <div className="set">{it.condition}</div>
-                <div className="price mono">{rate ? `$${mxn(Number(it.price)).toFixed(2)} MXN` : 'Cargando precio...'}</div>
-                <div className="hint" style={{ marginTop: -4 }}>${Number(it.price).toFixed(2)} USD</div>
-                <button className="primary" onClick={() => addToCart(it)}>Agregar</button>
+          {visible.map(it => {
+            const soldOut = it.qty <= 0;
+            return (
+              <div className="card" key={it.id} style={{ opacity: soldOut ? 0.55 : 1, cursor: 'pointer' }} onClick={() => setDetailItem(it)}>
+                <div className="art">{it.img && <img src={it.img} alt={it.name} />}</div>
+                <div className="info">
+                  {soldOut ? <span className="badge" style={{ background: 'var(--muted)' }}>Agotado</span> : it.qty <= 2 && <span className="badge">Últimas {it.qty}</span>}
+                  <div className="name"><CardBadges it={it} /> {it.name}</div>
+                  <div className="set">{it.condition}</div>
+                  <div className="price mono">{rate ? `$${mxn(Number(it.price)).toFixed(2)} MXN` : 'Cargando precio...'}</div>
+                  <div className="hint" style={{ marginTop: -4 }}>${Number(it.price).toFixed(2)} USD</div>
+                  <button className="primary" disabled={soldOut} style={soldOut ? { opacity: 0.5, cursor: 'not-allowed' } : {}} onClick={e => { e.stopPropagation(); addToCart(it); }}>
+                    {soldOut ? 'Agotado' : 'Agregar'}
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </main>
 
@@ -203,6 +228,37 @@ export default function Home() {
             <button className="ghost" style={{ width: '100%', marginTop: 8 }} onClick={() => setCartOpen(false)}>Cerrar</button>
           </div>
         </>
+      )}
+
+      {detailItem && (
+        <div className="modal-bg show" onClick={() => setDetailItem(null)}>
+          <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+            {detailItem.img && <img src={detailItem.img} alt={detailItem.name} style={{ width: '100%', borderRadius: 8, marginBottom: 14 }} />}
+            <h3 style={{ marginTop: 0, marginBottom: 4 }}>{detailItem.foil ? '🌈 ' : ''}{detailItem.name}</h3>
+            <p className="hint" style={{ marginTop: 0 }}>{detailItem.setName} · {detailItem.condition} · {LANGUAGES[detailItem.language] || detailItem.language}</p>
+            {detailItem.typeLine && <p style={{ fontSize: '0.85rem', margin: '6px 0' }}>{detailItem.typeLine}</p>}
+            <div style={{ display: 'flex', gap: 12, fontSize: '0.8rem', color: 'var(--muted)', marginBottom: 14 }}>
+              {detailItem.colors && <span>Colores: {detailItem.colors.split(',').filter(Boolean).join(', ') || 'Incoloro'}</span>}
+              {detailItem.rarity && <span>Rareza: {detailItem.rarity}</span>}
+            </div>
+            <div className="price mono" style={{ fontSize: '1.3rem' }}>{rate ? `$${mxn(Number(detailItem.price)).toFixed(2)} MXN` : '...'}</div>
+            <p className="hint" style={{ marginTop: 0 }}>${Number(detailItem.price).toFixed(2)} USD · {detailItem.qty > 0 ? `${detailItem.qty} disponibles` : 'Agotado'}</p>
+            <button
+              className="primary"
+              style={{ width: '100%', marginTop: 10, ...(detailItem.qty <= 0 ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+              disabled={detailItem.qty <= 0}
+              onClick={() => { addToCart(detailItem); setDetailItem(null); }}
+            >
+              {detailItem.qty <= 0 ? 'Agotado' : 'Agregar al carrito'}
+            </button>
+            {detailItem.scryfallUri && (
+              <p className="hint" style={{ marginTop: 10 }}>
+                <a href={detailItem.scryfallUri} target="_blank" rel="noreferrer" style={{ color: 'var(--gold)' }}>Ver ficha completa y gráfica de precio en Scryfall ↗</a>
+              </p>
+            )}
+            <button className="ghost" style={{ width: '100%', marginTop: 8 }} onClick={() => setDetailItem(null)}>Cerrar</button>
+          </div>
+        </div>
       )}
 
       <footer>Bóveda Arcana · Precios de referencia cortesía de Scryfall</footer>
