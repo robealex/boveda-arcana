@@ -106,6 +106,25 @@ export default function Admin() {
     alert(`Se guardaron ${dirty.length} carta(s).`);
   }
 
+  const [wipeModal, setWipeModal] = useState(false);
+  const [wipeCountdown, setWipeCountdown] = useState(5);
+
+  useEffect(() => {
+    if (!wipeModal) return;
+    setWipeCountdown(5);
+    const interval = setInterval(() => {
+      setWipeCountdown(c => (c > 0 ? c - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [wipeModal]);
+
+  async function wipeInventory() {
+    const r = await fetch('/api/inventory-wipe', { method: 'DELETE', headers: { 'x-admin-password': pw } });
+    if (!r.ok) { const d = await r.json(); alert(d.error || 'Error al borrar'); return; }
+    setWipeModal(false);
+    loadInventory();
+  }
+
 
   useEffect(() => {
     fetch('/api/exchange-rate').then(r => r.json()).then(d => setRate(d.rate));
@@ -652,6 +671,7 @@ export default function Admin() {
             <button className={invView === 'cards' ? 'active' : ''} onClick={() => setInvView('cards')}>🎴 Tarjetas</button>
             <button className={invView === 'table' ? 'active' : ''} onClick={() => setInvView('table')}>📋 Tabla</button>
           </div>
+          <button className="ghost" style={{ borderColor: 'var(--blood)', color: 'var(--blood)' }} onClick={() => setWipeModal(true)}>Borrar toda la biblioteca</button>
         </div>
       </div>
 
@@ -844,6 +864,33 @@ export default function Admin() {
             <div className="modal-actions">
               <button className="ghost" onClick={() => setEditingCustomer(null)}>Cancelar</button>
               <button className="primary" onClick={saveCustomer}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {wipeModal && (
+        <div className="modal-bg show">
+          <div className="modal" style={{ maxWidth: 380, borderColor: 'var(--blood)' }}>
+            <h3 style={{ marginTop: 0, color: 'var(--blood)' }}>¿Borrar TODA la biblioteca?</h3>
+            <p style={{ fontSize: '0.9rem' }}>
+              Esto va a eliminar las <strong>{items.length} cartas</strong> de tu inventario de forma permanente.
+              No se puede deshacer. El historial de pedidos se conserva, pero perderá el vínculo con las cartas.
+            </p>
+            <div className="modal-actions">
+              <button className="ghost" onClick={() => setWipeModal(false)}>Cancelar</button>
+              <button
+                onClick={wipeInventory}
+                disabled={wipeCountdown > 0}
+                style={{
+                  flex: 1, padding: '12px 22px', borderRadius: 'var(--radius)', fontWeight: 700, border: 'none',
+                  cursor: wipeCountdown > 0 ? 'not-allowed' : 'pointer',
+                  background: wipeCountdown > 0 ? 'var(--line)' : 'var(--blood)',
+                  color: wipeCountdown > 0 ? 'var(--muted)' : 'var(--parchment)'
+                }}
+              >
+                {wipeCountdown > 0 ? `Espera ${wipeCountdown}s...` : 'Sí, borrar todo definitivamente'}
+              </button>
             </div>
           </div>
         </div>
