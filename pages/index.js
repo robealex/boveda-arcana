@@ -114,6 +114,10 @@ export default function Home() {
   }
 
   async function confirmCheckout() {
+    if (!checkoutForm.phone.trim() && !checkoutForm.email.trim()) {
+      alert('Por favor deja al menos tu teléfono o tu correo, para poder contactarte sobre tu pedido.');
+      return;
+    }
     const token = typeof window !== 'undefined' ? localStorage.getItem('customer_token') : null;
     try {
       const r = await fetch('/api/orders', {
@@ -313,8 +317,8 @@ export default function Home() {
             {showCheckoutForm && (
               <div style={{ marginTop: 12 }}>
                 <div className="field"><label>Tu nombre</label><input value={checkoutForm.name} onChange={e => setCheckoutForm(f => ({ ...f, name: e.target.value }))} /></div>
-                <div className="field"><label>Tu teléfono</label><input value={checkoutForm.phone} onChange={e => setCheckoutForm(f => ({ ...f, phone: e.target.value }))} /></div>
-                <div className="field"><label>Tu correo (opcional, para confirmación)</label><input value={checkoutForm.email} onChange={e => setCheckoutForm(f => ({ ...f, email: e.target.value }))} /></div>
+                <div className="field"><label>Tu teléfono {!checkoutForm.email.trim() && '(obligatorio si no dejas correo)'}</label><input value={checkoutForm.phone} onChange={e => setCheckoutForm(f => ({ ...f, phone: e.target.value }))} /></div>
+                <div className="field"><label>Tu correo {!checkoutForm.phone.trim() && '(obligatorio si no dejas teléfono)'}</label><input value={checkoutForm.email} onChange={e => setCheckoutForm(f => ({ ...f, email: e.target.value }))} /></div>
                 <button className="primary" style={{ width: '100%' }} onClick={confirmCheckout}>Confirmar y enviar por WhatsApp</button>
                 <button className="ghost" style={{ width: '100%', marginTop: 8 }} onClick={() => setShowCheckoutForm(false)}>Atrás</button>
               </div>
