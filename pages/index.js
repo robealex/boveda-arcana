@@ -19,6 +19,8 @@ export default function Home() {
   const [account, setAccount] = useState(null);
   const [checkoutForm, setCheckoutForm] = useState({ name: '', phone: '', email: '' });
   const [showCheckoutForm, setShowCheckoutForm] = useState(false);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 20;
 
   const MAIN_TYPES = ['Creature', 'Instant', 'Sorcery', 'Artifact', 'Enchantment', 'Land', 'Planeswalker', 'Battle'];
   const COLOR_INFO = { W: 'Blanco', U: 'Azul', B: 'Negro', R: 'Rojo', G: 'Verde', C: 'Incoloro' };
@@ -73,6 +75,11 @@ export default function Home() {
       if (sortBy === 'price_desc') return Number(b.price) - Number(a.price);
       return new Date(b.createdAt) - new Date(a.createdAt);
     });
+
+  useEffect(() => { setPage(0); }, [filter, colorFilter, rarityFilter, typeFilter, sortBy]);
+
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const pagedVisible = visible.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
 
   function mxn(usdPrice) {
     if (!rate) return null;
@@ -221,7 +228,7 @@ export default function Home() {
         {items.length === 0 && <p className="hint">Todavía no hay cartas publicadas.</p>}
 
         <div className="grid">
-          {visible.map(it => {
+          {pagedVisible.map(it => {
             const soldOut = it.qty <= 0;
             return (
               <div className="card" key={it.id} style={{ opacity: soldOut ? 0.55 : 1, cursor: 'pointer' }} onClick={() => setDetailItem(it)}>
@@ -244,6 +251,25 @@ export default function Home() {
             );
           })}
         </div>
+
+        {visible.length > PAGE_SIZE && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 28 }}>
+            <button className="ghost" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>←</button>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', maxWidth: 400, justifyContent: 'center' }}>
+              {Array.from({ length: totalPages }).map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setPage(i)}
+                  style={{
+                    width: 9, height: 9, borderRadius: '50%', border: 'none', cursor: 'pointer', padding: 0,
+                    background: i === page ? 'var(--gold)' : 'var(--line)'
+                  }}
+                />
+              ))}
+            </div>
+            <button className="ghost" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1}>→</button>
+          </div>
+        )}
       </main>
 
       <button className="cart-fab" onClick={() => setCartOpen(true)}>
