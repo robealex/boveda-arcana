@@ -32,6 +32,19 @@ export default function Cuenta() {
       .then(d => setOrders(d.orders || []));
   }
 
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotMsg, setForgotMsg] = useState('');
+
+  async function submitForgot() {
+    setForgotMsg('');
+    const r = await fetch('/api/auth/forgot-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: forgotEmail })
+    });
+    const d = await r.json();
+    setForgotMsg(d.message || 'Si ese correo está registrado, te llegará un link.');
+  }
+
   async function submitAuth() {
     setError('');
     const url = mode === 'login' ? '/api/auth/login' : '/api/auth/signup';
@@ -98,6 +111,20 @@ export default function Cuenta() {
 
           {error && <p className="hint" style={{ color: 'var(--blood)' }}>{error}</p>}
           <button className="primary" style={{ width: '100%' }} onClick={submitAuth}>{mode === 'login' ? 'Entrar' : 'Crear cuenta'}</button>
+
+          {mode === 'login' && !forgotMode && (
+            <p className="hint" style={{ marginTop: 12 }}>
+              <a href="#" onClick={e => { e.preventDefault(); setForgotMode(true); }} style={{ color: 'var(--gold)' }}>¿Olvidaste tu contraseña?</a>
+            </p>
+          )}
+
+          {mode === 'login' && forgotMode && (
+            <div style={{ marginTop: 16, borderTop: '1px solid var(--line)', paddingTop: 16 }}>
+              <div className="field"><label>Tu correo</label><input value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} /></div>
+              <button className="ghost" onClick={submitForgot}>Enviar link de recuperación</button>
+              {forgotMsg && <p className="hint" style={{ marginTop: 8 }}>{forgotMsg}</p>}
+            </div>
+          )}
         </main>
         <footer>Bóveda Arcana</footer>
       </div>

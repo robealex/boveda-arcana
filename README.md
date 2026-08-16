@@ -56,6 +56,7 @@ En tu proyecto de Vercel: **Settings → Environment Variables**, agrega estas
 | `NEXT_PUBLIC_CONTACT_EMAIL` | correo que se muestra en la sección de contacto (opcional) | `robealex@hotmail.com` |
 | `RESEND_API_KEY` | para que te lleguen correos de nuevos pedidos (ver abajo) | `re_xxxxxxxx` |
 | `CUSTOMER_JWT_SECRET` | cualquier texto largo y aleatorio, para las sesiones de cuenta de cliente | `una-frase-larga-y-random-123` |
+| `NEXT_PUBLIC_SITE_URL` | opcional — tu URL pública, para que los links de recuperar contraseña apunten bien | `https://boveda-arcana.vercel.app` |
 
 ### Correos de pedidos (Resend)
 

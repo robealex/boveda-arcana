@@ -125,6 +125,23 @@ export default function Admin() {
     loadInventory();
   }
 
+  async function downloadFile(url, filename) {
+    const r = await fetch(url, { headers: { 'x-admin-password': pw } });
+    if (!r.ok) { alert('Error al generar el archivo'); return; }
+    const blob = await r.blob();
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+  }
+
+  const [stats, setStats] = useState(null);
+  useEffect(() => {
+    if (authed && view === 'stats') {
+      fetch('/api/stats', { headers: { 'x-admin-password': pw } }).then(r => r.json()).then(setStats);
+    }
+  }, [authed, view]);
+
 
   useEffect(() => {
     fetch('/api/exchange-rate').then(r => r.json()).then(d => setRate(d.rate));
@@ -489,6 +506,7 @@ export default function Admin() {
         <button className={`tab-btn ${view === 'inventory' ? 'active' : ''}`} onClick={() => setView('inventory')}>Inventario</button>
         <button className={`tab-btn ${view === 'orders' ? 'active' : ''}`} onClick={() => setView('orders')}>Pedidos</button>
         <button className={`tab-btn ${view === 'users' ? 'active' : ''}`} onClick={() => setView('users')}>Usuarios</button>
+        <button className={`tab-btn ${view === 'stats' ? 'active' : ''}`} onClick={() => setView('stats')}>Estadísticas</button>
       </div>
 
       {view === 'inventory' && (
@@ -671,6 +689,7 @@ export default function Admin() {
             <button className={invView === 'cards' ? 'active' : ''} onClick={() => setInvView('cards')}>🎴 Tarjetas</button>
             <button className={invView === 'table' ? 'active' : ''} onClick={() => setInvView('table')}>📋 Tabla</button>
           </div>
+          <button className="ghost" onClick={() => downloadFile('/api/export-inventory', 'boveda-arcana-biblioteca.csv')}>Descargar biblioteca (CSV)</button>
           <button className="ghost" style={{ borderColor: 'var(--blood)', color: 'var(--blood)' }} onClick={() => setWipeModal(true)}>Borrar toda la biblioteca</button>
         </div>
       </div>
@@ -774,7 +793,10 @@ export default function Admin() {
 
       {view === 'orders' && (
         <div>
-          <h3 style={{ marginTop: 8 }}>Pedidos ({orders.length})</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+            <h3 style={{ marginTop: 8, marginBottom: 0 }}>Pedidos ({orders.length})</h3>
+            <button className="ghost" onClick={() => downloadFile('/api/export-orders', 'boveda-arcana-pedidos.csv')}>Exportar pedidos confirmados (CSV)</button>
+          </div>
           {orders.length === 0 && <p className="hint">Todavía no hay pedidos.</p>}
           {orders.map(o => {
             const st = orderDisplayStatus(o);
@@ -850,6 +872,59 @@ export default function Admin() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {view === 'stats' && (
+        <div>
+          <h3 style={{ marginTop: 8 }}>Estadísticas</h3>
+          {!stats && <p className="hint">Cargando...</p>}
+          {stats && (
+            <>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
+                <div style={{ background: 'var(--ink2)', border: '1px solid var(--line)', borderRadius: 10, padding: 18, minWidth: 180, flex: 1 }}>
+                  <div className="hint">Total vendido</div>
+                  <div className="price mono" style={{ fontSize: '1.4rem' }}>${stats.totalSoldUsd.toFixed(2)} USD</div>
+                  {rate && <div className="hint">≈${(stats.totalSoldUsd * rate).toFixed(2)} MXN</div>}
+                </div>
+                <div style={{ background: 'var(--ink2)', border: '1px solid var(--line)', borderRadius: 10, padding: 18, minWidth: 180, flex: 1 }}>
+                  <div className="hint">Cartas vendidas</div>
+                  <div className="price mono" style={{ fontSize: '1.4rem' }}>{stats.totalCardsSold}</div>
+                </div>
+                <div style={{ background: 'var(--ink2)', border: '1px solid var(--line)', borderRadius: 10, padding: 18, minWidth: 180, flex: 1 }}>
+                  <div className="hint">Pedidos confirmados</div>
+                  <div className="price mono" style={{ fontSize: '1.4rem' }}>{stats.confirmedOrdersCount}</div>
+                </div>
+              </div>
+
+              <h4>Ingresos por mes (USD)</h4>
+              {stats.monthly.length === 0 && <p className="hint">Todavía no hay ventas confirmadas.</p>}
+              {stats.monthly.length > 0 && (
+                <div style={{ marginBottom: 28 }}>
+                  {stats.monthly.map(m => {
+                    const max = Math.max(...stats.monthly.map(x => x.total));
+                    return (
+                      <div key={m.month} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                        <span className="hint" style={{ width: 70 }}>{m.month}</span>
+                        <div style={{ background: 'var(--gold)', height: 16, borderRadius: 4, width: `${Math.max(4, (m.total / max) * 100)}%` }} />
+                        <span className="mono" style={{ fontSize: '0.8rem' }}>${m.total.toFixed(2)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <h4>Cartas más vistas sin vender</h4>
+              <p className="hint" style={{ marginTop: -6 }}>Buenas candidatas para bajarle el precio o revisar por qué no se mueven.</p>
+              {stats.viewedNotSold.length === 0 && <p className="hint">No hay datos suficientes todavía.</p>}
+              {stats.viewedNotSold.map(it => (
+                <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
+                  <span>{it.name}</span>
+                  <span className="hint">👁 {it.views} vistas · ${it.price.toFixed(2)} USD</span>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
 

@@ -44,14 +44,16 @@ model PriceSnapshot {
 }
 
 model Customer {
-  id           Int      @id @default(autoincrement())
-  name         String
-  email        String   @unique
-  phone        String?
-  address      String?
-  passwordHash String   @map("password_hash")
-  createdAt    DateTime @default(now()) @map("created_at")
-  orders       Order[]
+  id                Int      @id @default(autoincrement())
+  name              String
+  email             String   @unique
+  phone             String?
+  address           String?
+  passwordHash      String   @map("password_hash")
+  resetToken        String?  @map("reset_token")
+  resetTokenExpiry  DateTime? @map("reset_token_expiry")
+  createdAt         DateTime @default(now()) @map("created_at")
+  orders            Order[]
 
   @@map("customers")
 }
