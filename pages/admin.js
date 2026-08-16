@@ -462,18 +462,42 @@ export default function Admin() {
     e.target.value = '';
   }
 
+  async function lookupWithTimeout(name, timeoutMs = 8000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch('/api/card-lookup?name=' + encodeURIComponent(name), { signal: controller.signal });
+      const d = await res.json();
+      clearTimeout(timer);
+      if (!res.ok) return { ok: false };
+      return { ok: true, data: d };
+    } catch (e) {
+      clearTimeout(timer);
+      return { ok: false };
+    }
+  }
+
   async function runImportLookups(rowsToProcess) {
     setImporting(true);
     for (let i = 0; i < rowsToProcess.length; i++) {
       setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'loading' } : r));
-      try {
-        const res = await fetch('/api/card-lookup?name=' + encodeURIComponent(rowsToProcess[i].name));
-        const d = await res.json();
-        if (!res.ok) setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'notfound' } : r));
-        else setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'found', data: d, price: d.usd || '' } : r));
-      } catch (e) {
-        setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'notfound' } : r));
-      }
+      const result = await lookupWithTimeout(rowsToProcess[i].name);
+      if (!result.ok) setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'notfound' } : r));
+      else setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'found', data: result.data, price: result.data.usd || '' } : r));
+      await new Promise(res => setTimeout(res, 120));
+    }
+    setImporting(false);
+  }
+
+  async function retryAllFailed() {
+    const failedIdx = csvRows.map((r, i) => ({ r, i })).filter(x => x.r.status === 'notfound').map(x => x.i);
+    if (failedIdx.length === 0) return;
+    setImporting(true);
+    for (const i of failedIdx) {
+      setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'loading' } : r));
+      const result = await lookupWithTimeout(csvRows[i].name);
+      if (!result.ok) setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'notfound' } : r));
+      else setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'found', data: result.data, price: result.data.usd || '' } : r));
       await new Promise(res => setTimeout(res, 120));
     }
     setImporting(false);
@@ -485,14 +509,9 @@ export default function Admin() {
 
   async function retryCsvRow(i) {
     updateCsvRow(i, { status: 'loading' });
-    try {
-      const res = await fetch('/api/card-lookup?name=' + encodeURIComponent(csvRows[i].name));
-      const d = await res.json();
-      if (!res.ok) updateCsvRow(i, { status: 'notfound' });
-      else updateCsvRow(i, { status: 'found', data: d, price: d.usd || '' });
-    } catch (e) {
-      updateCsvRow(i, { status: 'notfound' });
-    }
+    const result = await lookupWithTimeout(csvRows[i].name);
+    if (!result.ok) updateCsvRow(i, { status: 'notfound' });
+    else updateCsvRow(i, { status: 'found', data: result.data, price: result.data.usd || '' });
   }
 
   async function importSelected() {
@@ -597,10 +616,15 @@ export default function Admin() {
                 </div>
               ))}
 
-              <div style={{ display: 'flex', gap: 10, marginTop: 16, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 10, marginTop: 16, alignItems: 'center', flexWrap: 'wrap' }}>
                 <button className="primary" onClick={importSelected} disabled={importing}>
                   {importing ? 'Procesando...' : `Agregar seleccionadas (${csvRows.filter(r => r.include && r.status === 'found').length})`}
                 </button>
+                {csvRows.some(r => r.status === 'notfound') && (
+                  <button className="ghost" onClick={retryAllFailed} disabled={importing}>
+                    Reintentar fallidas ({csvRows.filter(r => r.status === 'notfound').length})
+                  </button>
+                )}
                 <button className="ghost" onClick={() => setCsvRows([])} disabled={importing}>Cancelar importación</button>
               </div>
             </div>
