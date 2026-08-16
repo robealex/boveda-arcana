@@ -11,6 +11,15 @@ export default function Home() {
   const [cart, setCart] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [rate, setRate] = useState(null);
+  const [pricingSettings, setPricingSettings] = useState(null);
+  const CONDITION_FIELD = {
+    'Near Mint': 'nearMintPct', 'Lightly Played': 'lightlyPlayedPct', 'Moderately Played': 'moderatelyPlayedPct',
+    'Heavily Played': 'heavilyPlayedPct', 'Damaged': 'damagedPct'
+  };
+  function pctFor(condition) {
+    if (!pricingSettings) return 100;
+    return pricingSettings[CONDITION_FIELD[condition]] ?? 100;
+  }
   const [sortBy, setSortBy] = useState('newest');
   const [colorFilter, setColorFilter] = useState([]);
   const [rarityFilter, setRarityFilter] = useState('');
@@ -39,6 +48,7 @@ export default function Home() {
   useEffect(() => {
     loadInventory();
     fetch('/api/exchange-rate').then(r => r.json()).then(d => setRate(d.rate));
+    fetch('/api/pricing-settings').then(r => r.json()).then(d => setPricingSettings(d.settings));
     const token = typeof window !== 'undefined' ? localStorage.getItem('customer_token') : null;
     if (token) {
       fetch('/api/auth/me', { headers: { 'x-customer-token': token } })
@@ -264,7 +274,7 @@ export default function Home() {
                   {soldOut ? <span className="badge" style={{ background: 'var(--muted)' }}>Agotado</span> : it.qty <= 2 && <span className="badge">Últimas {it.qty}</span>}
                   {it.originalPrice && it.originalPrice > it.price && <span className="badge" style={{ background: 'var(--teal)', marginLeft: it.qty <= 2 || soldOut ? 6 : 0 }}>Oferta</span>}
                   <div className="name"><CardBadges it={it} /> {it.name}</div>
-                  <div className="set">{it.condition}</div>
+                  <div className="set">{it.condition}{pctFor(it.condition) < 100 ? ` (${pctFor(it.condition)}% valor NM)` : ''}</div>
                   {it.originalPrice && it.originalPrice > it.price && rate && (
                     <div className="hint" style={{ textDecoration: 'line-through', marginBottom: -4 }}>${mxn(Number(it.originalPrice)).toFixed(2)} MXN</div>
                   )}
@@ -305,7 +315,7 @@ export default function Home() {
                       <CardBadges it={it} /> {it.name}
                     </td>
                     <td className="hint">{it.setName}</td>
-                    <td className="hint">{it.condition}</td>
+                    <td className="hint">{it.condition}{pctFor(it.condition) < 100 ? ` (${pctFor(it.condition)}%)` : ''}</td>
                     <td className="mono">{rate ? `$${mxn(Number(it.price)).toFixed(2)} MXN` : '...'}</td>
                     <td>{soldOut ? <span style={{ color: 'var(--blood)' }}>Agotado</span> : it.qty}</td>
                     <td>
@@ -399,7 +409,7 @@ export default function Home() {
           <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
             {detailItem.img && <img src={detailItem.img} alt={detailItem.name} style={{ width: '100%', borderRadius: 8, marginBottom: 14 }} />}
             <h3 style={{ marginTop: 0, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>{detailItem.foil && <span className="foil-badge" title="Foil" />}{detailItem.name}</h3>
-            <p className="hint" style={{ marginTop: 0 }}>{detailItem.setName} · {detailItem.condition} · {LANGUAGES[detailItem.language] || detailItem.language}</p>
+            <p className="hint" style={{ marginTop: 0 }}>{detailItem.setName} · {detailItem.condition}{pctFor(detailItem.condition) < 100 ? ` (${pctFor(detailItem.condition)}% del valor Near Mint)` : ''} · {LANGUAGES[detailItem.language] || detailItem.language}</p>
             {detailItem.typeLine && <p style={{ fontSize: '0.85rem', margin: '6px 0' }}>{detailItem.typeLine}</p>}
             <div style={{ display: 'flex', gap: 12, fontSize: '0.8rem', color: 'var(--muted)', marginBottom: 14 }}>
               {detailItem.colors && <span>Colores: {detailItem.colors.split(',').filter(Boolean).join(', ') || 'Incoloro'}</span>}

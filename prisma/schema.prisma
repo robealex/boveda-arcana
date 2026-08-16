@@ -7,6 +7,17 @@ datasource db {
   url      = env("DATABASE_POSTGRES_URL")
 }
 
+model PricingSettings {
+  id                    Int @id @default(1)
+  nearMintPct           Int @default(100) @map("near_mint_pct")
+  lightlyPlayedPct      Int @default(90) @map("lightly_played_pct")
+  moderatelyPlayedPct   Int @default(70) @map("moderately_played_pct")
+  heavilyPlayedPct      Int @default(50) @map("heavily_played_pct")
+  damagedPct            Int @default(30) @map("damaged_pct")
+
+  @@map("pricing_settings")
+}
+
 model StockAlert {
   id          Int       @id @default(autoincrement())
   inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)

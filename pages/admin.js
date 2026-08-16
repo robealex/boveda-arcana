@@ -171,6 +171,30 @@ export default function Admin() {
 
   const [stats, setStats] = useState(null);
 
+  const CONDITION_FIELD = {
+    'Near Mint': 'nearMintPct', 'Lightly Played': 'lightlyPlayedPct', 'Moderately Played': 'moderatelyPlayedPct',
+    'Heavily Played': 'heavilyPlayedPct', 'Damaged': 'damagedPct'
+  };
+  const [pricingSettings, setPricingSettings] = useState(null);
+  useEffect(() => {
+    fetch('/api/pricing-settings').then(r => r.json()).then(d => setPricingSettings(d.settings));
+  }, []);
+
+  function pctFor(condition) {
+    if (!pricingSettings) return 100;
+    return pricingSettings[CONDITION_FIELD[condition]] ?? 100;
+  }
+
+  async function savePricingSettings() {
+    const r = await fetch('/api/pricing-settings', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
+      body: JSON.stringify(pricingSettings)
+    });
+    if (!r.ok) { alert('Error al guardar'); return; }
+    alert('Porcentajes guardados.');
+  }
+
+
 
   useEffect(() => {
     fetch('/api/exchange-rate').then(r => r.json()).then(d => setRate(d.rate));
@@ -483,7 +507,7 @@ export default function Admin() {
       setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'loading' } : r));
       const result = await lookupWithTimeout(rowsToProcess[i].name);
       if (!result.ok) setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'notfound' } : r));
-      else setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'found', data: result.data, price: result.data.usd || '' } : r));
+      else setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'found', data: result.data, price: result.data.usd ? (parseFloat(result.data.usd) * pctFor(r.condition) / 100).toFixed(2) : '' } : r));
       await new Promise(res => setTimeout(res, 120));
     }
     setImporting(false);
@@ -497,7 +521,7 @@ export default function Admin() {
       setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'loading' } : r));
       const result = await lookupWithTimeout(csvRows[i].name);
       if (!result.ok) setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'notfound' } : r));
-      else setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'found', data: result.data, price: result.data.usd || '' } : r));
+      else setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'found', data: result.data, price: result.data.usd ? (parseFloat(result.data.usd) * pctFor(r.condition) / 100).toFixed(2) : '' } : r));
       await new Promise(res => setTimeout(res, 120));
     }
     setImporting(false);
@@ -511,7 +535,7 @@ export default function Admin() {
     updateCsvRow(i, { status: 'loading' });
     const result = await lookupWithTimeout(csvRows[i].name);
     if (!result.ok) updateCsvRow(i, { status: 'notfound' });
-    else updateCsvRow(i, { status: 'found', data: result.data, price: result.data.usd || '' });
+    else updateCsvRow(i, { status: 'found', data: result.data, price: result.data.usd ? (parseFloat(result.data.usd) * pctFor(csvRows[i].condition) / 100).toFixed(2) : '' });
   }
 
   async function importSelected() {
@@ -560,6 +584,7 @@ export default function Admin() {
         <button className={`tab-btn ${view === 'orders' ? 'active' : ''}`} onClick={() => setView('orders')}>Pedidos</button>
         <button className={`tab-btn ${view === 'users' ? 'active' : ''}`} onClick={() => setView('users')}>Usuarios</button>
         <button className={`tab-btn ${view === 'stats' ? 'active' : ''}`} onClick={() => setView('stats')}>Estadísticas</button>
+        <button className={`tab-btn ${view === 'pricing' ? 'active' : ''}`} onClick={() => setView('pricing')}>Precios</button>
       </div>
 
       {view === 'inventory' && (
@@ -606,7 +631,12 @@ export default function Admin() {
                         <input type="number" value={r.price} onChange={e => updateCsvRow(i, { price: e.target.value })} style={{ width: 90 }} />
                         <span className="hint">Cant.:</span>
                         <input type="number" value={r.qty} onChange={e => updateCsvRow(i, { qty: parseInt(e.target.value) || 1 })} style={{ width: 60 }} />
-                        <select value={r.condition} onChange={e => updateCsvRow(i, { condition: e.target.value })} style={{ width: 160 }}>
+                        <select value={r.condition} onChange={e => {
+                          const newCond = e.target.value;
+                          const patch = { condition: newCond };
+                          if (r.data?.usd) patch.price = (parseFloat(r.data.usd) * pctFor(newCond) / 100).toFixed(2);
+                          updateCsvRow(i, patch);
+                        }} style={{ width: 160 }}>
                           <option>Near Mint</option><option>Lightly Played</option><option>Moderately Played</option><option>Heavily Played</option><option>Damaged</option>
                         </select>
                         {r.data.usd && <span className="hint">(ref. Scryfall: ${r.data.usd} USD)</span>}
@@ -948,6 +978,30 @@ export default function Admin() {
         </div>
       )}
 
+      {view === 'pricing' && pricingSettings && (
+        <div style={{ maxWidth: 420 }}>
+          <h3 style={{ marginTop: 8 }}>Precio automático según condición</h3>
+          <p className="hint">
+            Al agregar una carta, el precio se sugiere como este % del precio de referencia de Scryfall (que es el
+            precio de una carta en Near Mint). Se aplica solo, pero siempre puedes ajustarlo a mano después.
+          </p>
+          {[
+            ['Near Mint', 'nearMintPct'],
+            ['Lightly Played', 'lightlyPlayedPct'],
+            ['Moderately Played', 'moderatelyPlayedPct'],
+            ['Heavily Played', 'heavilyPlayedPct'],
+            ['Damaged', 'damagedPct']
+          ].map(([label, field]) => (
+            <div key={field} className="field" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <label style={{ width: 160, marginBottom: 0 }}>{label}</label>
+              <input type="number" value={pricingSettings[field]} onChange={e => setPricingSettings(s => ({ ...s, [field]: e.target.value }))} style={{ width: 80 }} />
+              <span className="hint">%</span>
+            </div>
+          ))}
+          <button className="primary" onClick={savePricingSettings}>Guardar porcentajes</button>
+        </div>
+      )}
+
       {view === 'stats' && (
         <div>
           <h3 style={{ marginTop: 8 }}>Estadísticas</h3>
@@ -1089,9 +1143,19 @@ export default function Admin() {
             )}
 
             <div className="field"><label>Condición</label>
-              <select value={modalItem.condition} onChange={e => setModalItem(m => ({ ...m, condition: e.target.value }))}>
+              <select value={modalItem.condition} onChange={e => {
+                const newCond = e.target.value;
+                setModalItem(m => {
+                  const next = { ...m, condition: newCond };
+                  if (m.ref_usd) next.price = (parseFloat(m.ref_usd) * pctFor(newCond) / 100).toFixed(2);
+                  return next;
+                });
+              }}>
                 <option>Near Mint</option><option>Lightly Played</option><option>Moderately Played</option><option>Heavily Played</option><option>Damaged</option>
               </select>
+              <p className="hint" style={{ marginTop: 4, marginBottom: 0 }}>
+                {pctFor(modalItem.condition)}% del precio de referencia{modalItem.ref_usd ? ` ($${modalItem.ref_usd} USD NM)` : ''}
+              </p>
             </div>
 
             <div className="field"><label>Rareza</label>
