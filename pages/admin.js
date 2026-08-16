@@ -9,6 +9,7 @@ export default function Admin() {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
   const [rate, setRate] = useState(null);
+  const [liveRate, setLiveRate] = useState(null);
   const [sortBy, setSortBy] = useState('newest');
 
   // ---------- Búsqueda avanzada ----------
@@ -197,7 +198,7 @@ export default function Admin() {
 
 
   useEffect(() => {
-    fetch('/api/exchange-rate').then(r => r.json()).then(d => setRate(d.rate));
+    fetch('/api/exchange-rate').then(r => r.json()).then(d => { setRate(d.rate); setLiveRate(d.liveRate); });
   }, []);
 
   useEffect(() => {
@@ -1010,6 +1011,51 @@ export default function Admin() {
             </div>
           ))}
           <button className="primary" onClick={savePricingSettings}>Guardar porcentajes</button>
+
+          <hr style={{ border: 'none', borderTop: '1px solid var(--line)', margin: '32px 0 20px' }} />
+
+          <h3>Tipo de cambio</h3>
+          <p className="hint">
+            Por default se usa el tipo de cambio del día (USD → MXN, actualizado una vez al día).
+            Si quieres fijar tú el número —por ejemplo redondearlo hacia abajo, o darte un margen— actívalo aquí.
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <input type="checkbox" checked={pricingSettings.customRateEnabled} onChange={e => setPricingSettings(s => ({ ...s, customRateEnabled: e.target.checked }))} style={{ width: 'auto' }} />
+            <label style={{ marginBottom: 0 }}>Usar tipo de cambio manual</label>
+          </div>
+          {pricingSettings.customRateEnabled && (
+            <div className="field" style={{ display: 'flex', alignItems: 'center', gap: 10, maxWidth: 220 }}>
+              <input type="number" step="0.01" value={pricingSettings.customRate ?? ''} onChange={e => setPricingSettings(s => ({ ...s, customRate: e.target.value }))} placeholder="ej. 17.00" />
+              <span className="hint">MXN por USD</span>
+            </div>
+          )}
+          {liveRate && <p className="hint">Hoy la API marca: ${liveRate.toFixed(2)} MXN por USD</p>}
+          <button className="primary" onClick={savePricingSettings}>Guardar tipo de cambio</button>
+
+          <hr style={{ border: 'none', borderTop: '1px solid var(--line)', margin: '32px 0 20px' }} />
+
+          <h3>Descuento general de la tienda</h3>
+          <p className="hint">
+            Baja el precio de TODA la tienda un porcentaje extra, encima de cualquier descuento por condición u oferta
+            individual. Se muestra un banner en la tienda avisando a los clientes.
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <input type="checkbox" checked={pricingSettings.globalDiscountEnabled} onChange={e => setPricingSettings(s => ({ ...s, globalDiscountEnabled: e.target.checked }))} style={{ width: 'auto' }} />
+            <label style={{ marginBottom: 0 }}>Activar descuento general</label>
+          </div>
+          <div className="field" style={{ display: 'flex', alignItems: 'center', gap: 10, maxWidth: 200 }}>
+            <input type="number" value={pricingSettings.globalDiscountPct} onChange={e => setPricingSettings(s => ({ ...s, globalDiscountPct: e.target.value }))} style={{ width: 80 }} />
+            <span className="hint">% de descuento</span>
+          </div>
+          <div className="field">
+            <label>Empieza (opcional — si lo dejas vacío, empieza ya)</label>
+            <input type="datetime-local" value={pricingSettings.globalDiscountStart ? pricingSettings.globalDiscountStart.slice(0, 16) : ''} onChange={e => setPricingSettings(s => ({ ...s, globalDiscountStart: e.target.value }))} />
+          </div>
+          <div className="field">
+            <label>Termina (opcional — si lo dejas vacío, dura hasta que lo apagues)</label>
+            <input type="datetime-local" value={pricingSettings.globalDiscountEnd ? pricingSettings.globalDiscountEnd.slice(0, 16) : ''} onChange={e => setPricingSettings(s => ({ ...s, globalDiscountEnd: e.target.value }))} />
+          </div>
+          <button className="primary" onClick={savePricingSettings}>Guardar descuento general</button>
         </div>
       )}
 

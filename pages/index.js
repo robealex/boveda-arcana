@@ -21,18 +21,34 @@ export default function Home() {
     return pricingSettings[CONDITION_FIELD[condition]] ?? 100;
   }
 
+  const globalDiscountActive = Boolean(
+    pricingSettings?.globalDiscountEnabled &&
+    pricingSettings.globalDiscountPct > 0 &&
+    (!pricingSettings.globalDiscountStart || new Date(pricingSettings.globalDiscountStart) <= new Date()) &&
+    (!pricingSettings.globalDiscountEnd || new Date(pricingSettings.globalDiscountEnd) >= new Date())
+  );
+  const globalPct = pricingSettings?.globalDiscountPct || 0;
+
   function discountInfo(it) {
-    const price = Number(it.price);
-    if (it.originalPrice && it.originalPrice > price) {
-      const pctOff = Math.round((1 - price / it.originalPrice) * 100);
-      return { refPrice: Number(it.originalPrice), pctOff };
+    const basePrice = Number(it.price);
+    let refPrice = null;
+    if (it.originalPrice && it.originalPrice > basePrice) {
+      refPrice = Number(it.originalPrice);
+    } else {
+      const pct = pctFor(it.condition);
+      if (pct < 100) refPrice = basePrice / (pct / 100);
     }
-    const pct = pctFor(it.condition);
-    if (pct < 100) {
-      const refPrice = price / (pct / 100);
-      return { refPrice, pctOff: 100 - pct };
-    }
-    return null;
+    const finalPrice = globalDiscountActive ? basePrice * (1 - globalPct / 100) : basePrice;
+    if (!refPrice && globalDiscountActive) refPrice = basePrice;
+    if (!refPrice) return null;
+    const pctOff = Math.round((1 - finalPrice / refPrice) * 100);
+    if (pctOff <= 0) return null;
+    return { refPrice, pctOff, finalPrice };
+  }
+
+  function payPrice(it) {
+    const disc = discountInfo(it);
+    return disc ? disc.finalPrice : Number(it.price);
   }
   const [sortBy, setSortBy] = useState('newest');
   const [colorFilter, setColorFilter] = useState([]);
@@ -133,7 +149,7 @@ export default function Home() {
         if (existing.qty < it.qty) return prev.map(c => c.id === it.id ? { ...c, qty: c.qty + 1 } : c);
         return prev;
       }
-      return [...prev, { id: it.id, name: it.name, priceUsd: Number(it.price), img: it.img, qty: 1, max: it.qty, stripe_link: it.stripeLink }];
+      return [...prev, { id: it.id, name: it.name, priceUsd: payPrice(it), img: it.img, qty: 1, max: it.qty, stripe_link: it.stripeLink }];
     });
     setCartOpen(true);
   }
@@ -224,6 +240,15 @@ export default function Home() {
         </div>
       </div>
 
+      {globalDiscountActive && (
+        <div style={{
+          background: 'linear-gradient(90deg, var(--blood), #a33d3d)', color: 'var(--parchment)',
+          textAlign: 'center', padding: '10px 16px', fontWeight: 700, fontSize: '0.9rem'
+        }}>
+          🔥 Hoy la Bóveda está a -{globalPct}% de descuento en todo
+        </div>
+      )}
+
       <main>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
           <div className="field" style={{ maxWidth: 300, marginBottom: 0 }}>
@@ -297,8 +322,8 @@ export default function Home() {
                   {disc && rate && (
                     <div className="hint" style={{ textDecoration: 'line-through', marginBottom: -4 }}>${mxn(disc.refPrice).toFixed(2)} MXN</div>
                   )}
-                  <div className="price mono" style={disc ? { color: 'var(--blood)' } : {}}>{rate ? `$${mxn(Number(it.price)).toFixed(2)} MXN` : 'Cargando precio...'}</div>
-                  <div className="hint" style={{ marginTop: -4 }}>${Number(it.price).toFixed(2)} USD</div>
+                  <div className="price mono" style={disc ? { color: 'var(--blood)' } : {}}>{rate ? `$${mxn(payPrice(it)).toFixed(2)} MXN` : 'Cargando precio...'}</div>
+                  <div className="hint" style={{ marginTop: -4 }}>${payPrice(it).toFixed(2)} USD</div>
                   <button className="primary" disabled={soldOut} style={soldOut ? { opacity: 0.5, cursor: 'not-allowed' } : {}} onClick={e => { e.stopPropagation(); addToCart(it); }}>
                     {soldOut ? 'Agotado' : 'Agregar'}
                   </button>
@@ -336,7 +361,7 @@ export default function Home() {
                     </td>
                     <td className="hint">{it.setName}</td>
                     <td className="hint">{it.condition}</td>
-                    <td className="mono" style={disc ? { color: 'var(--blood)' } : {}}>{rate ? `$${mxn(Number(it.price)).toFixed(2)} MXN` : '...'}</td>
+                    <td className="mono" style={disc ? { color: 'var(--blood)' } : {}}>{rate ? `$${mxn(payPrice(it)).toFixed(2)} MXN` : '...'}</td>
                     <td>{soldOut ? <span style={{ color: 'var(--blood)' }}>Agotado</span> : it.qty}</td>
                     <td>
                       <button className="ghost" disabled={soldOut} style={soldOut ? { opacity: 0.5 } : {}} onClick={() => addToCart(it)}>
@@ -446,9 +471,9 @@ export default function Home() {
               {discountInfo(detailItem) && rate && (
                 <span style={{ textDecoration: 'line-through', color: 'var(--muted)', fontSize: '1rem', marginRight: 8 }}>${mxn(discountInfo(detailItem).refPrice).toFixed(2)}</span>
               )}
-              {rate ? `$${mxn(Number(detailItem.price)).toFixed(2)} MXN` : '...'}
+              {rate ? `$${mxn(payPrice(detailItem)).toFixed(2)} MXN` : '...'}
             </div>
-            <p className="hint" style={{ marginTop: 0 }}>${Number(detailItem.price).toFixed(2)} USD · {detailItem.qty > 0 ? `${detailItem.qty} disponibles` : 'Agotado'}</p>
+            <p className="hint" style={{ marginTop: 0 }}>${payPrice(detailItem).toFixed(2)} USD · {detailItem.qty > 0 ? `${detailItem.qty} disponibles` : 'Agotado'}</p>
             <button
               className="primary"
               style={{ width: '100%', marginTop: 10, ...(detailItem.qty <= 0 ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}

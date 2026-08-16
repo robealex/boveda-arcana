@@ -8,12 +8,18 @@ datasource db {
 }
 
 model PricingSettings {
-  id                    Int @id @default(1)
-  nearMintPct           Int @default(100) @map("near_mint_pct")
-  lightlyPlayedPct      Int @default(90) @map("lightly_played_pct")
-  moderatelyPlayedPct   Int @default(70) @map("moderately_played_pct")
-  heavilyPlayedPct      Int @default(50) @map("heavily_played_pct")
-  damagedPct            Int @default(30) @map("damaged_pct")
+  id                    Int       @id @default(1)
+  nearMintPct           Int       @default(100) @map("near_mint_pct")
+  lightlyPlayedPct      Int       @default(90) @map("lightly_played_pct")
+  moderatelyPlayedPct   Int       @default(70) @map("moderately_played_pct")
+  heavilyPlayedPct      Int       @default(50) @map("heavily_played_pct")
+  damagedPct            Int       @default(30) @map("damaged_pct")
+  customRateEnabled     Boolean   @default(false) @map("custom_rate_enabled")
+  customRate            Float?    @map("custom_rate")
+  globalDiscountEnabled Boolean   @default(false) @map("global_discount_enabled")
+  globalDiscountPct     Int       @default(0) @map("global_discount_pct")
+  globalDiscountStart   DateTime? @map("global_discount_start")
+  globalDiscountEnd     DateTime? @map("global_discount_end")
 
   @@map("pricing_settings")
 }
