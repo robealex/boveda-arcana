@@ -89,6 +89,40 @@ export default function Admin() {
 
   const dirtyCount = pagedItems.filter(isRowDirty).length;
 
+  // ---------- Selección múltiple y acciones en bloque ----------
+  const [selectedIds, setSelectedIds] = useState([]);
+  function toggleSelect(id) {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }
+  function toggleSelectAll() {
+    setSelectedIds(prev => prev.length === pagedItems.length ? [] : pagedItems.map(it => it.id));
+  }
+
+  async function bulkPricePct() {
+    const pct = prompt('¿Cambiar el precio qué porcentaje? (ej. 10 para subir 10%, -15 para bajar 15%)');
+    if (pct === null || pct.trim() === '' || isNaN(parseFloat(pct))) return;
+    const r = await fetch('/api/inventory-bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
+      body: JSON.stringify({ ids: selectedIds, action: 'price_pct', percent: pct })
+    });
+    if (!r.ok) { const d = await r.json(); alert(d.error || 'Error'); return; }
+    setSelectedIds([]);
+    loadInventory();
+  }
+
+  async function bulkDelete() {
+    if (!confirm(`¿Eliminar ${selectedIds.length} carta(s) seleccionadas? No se puede deshacer.`)) return;
+    const r = await fetch('/api/inventory-bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
+      body: JSON.stringify({ ids: selectedIds, action: 'delete' })
+    });
+    if (!r.ok) { const d = await r.json(); alert(d.error || 'Error'); return; }
+    setSelectedIds([]);
+    loadInventory();
+  }
+
   async function saveAllRowEdits() {
     const dirty = pagedItems.filter(isRowDirty);
     if (dirty.length === 0) return;
@@ -721,10 +755,21 @@ export default function Admin() {
       {invView === 'table' && (
         <div>
           <p className="hint" style={{ marginTop: 12 }}>Edita directo en la tabla y dale "Guardar cambios" al final. Si cambias de página sin guardar, se pierden los cambios de esta página.</p>
+
+          {selectedIds.length > 0 && (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', background: 'var(--ink2)', border: '1px solid var(--gold)', borderRadius: 8, padding: 10, marginBottom: 10 }}>
+              <span style={{ fontSize: '0.85rem' }}>{selectedIds.length} seleccionada(s)</span>
+              <button className="ghost" onClick={bulkPricePct}>Cambiar precio %</button>
+              <button className="ghost" style={{ borderColor: 'var(--blood)', color: 'var(--blood)' }} onClick={bulkDelete}>Eliminar seleccionadas</button>
+              <button className="ghost" onClick={() => setSelectedIds([])}>Deseleccionar</button>
+            </div>
+          )}
+
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
               <thead>
                 <tr>
+                  <th><input type="checkbox" checked={selectedIds.length === pagedItems.length && pagedItems.length > 0} onChange={toggleSelectAll} style={{ width: 'auto' }} /></th>
                   <th></th><th>Nombre</th><th>Edición</th><th>Precio USD</th><th>Cant.</th><th>Condición</th><th>Foil</th><th></th>
                 </tr>
               </thead>
@@ -734,6 +779,7 @@ export default function Admin() {
                   const dirty = isRowDirty(it);
                   return (
                     <tr key={it.id} style={dirty ? { background: 'rgba(201,162,39,0.06)' } : {}}>
+                      <td><input type="checkbox" checked={selectedIds.includes(it.id)} onChange={() => toggleSelect(it.id)} style={{ width: 'auto' }} /></td>
                       <td>
                         {it.img && (
                           <div className="hover-thumb-wrap">
@@ -845,6 +891,9 @@ export default function Admin() {
                     </button>
                   </div>
                 )}
+                <a href={`/recibo/${o.id}`} target="_blank" rel="noreferrer">
+                  <button className="ghost" style={{ marginTop: 8 }}>Ver / imprimir recibo</button>
+                </a>
               </div>
             );
           })}

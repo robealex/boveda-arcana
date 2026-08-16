@@ -39,6 +39,25 @@ export default async function handler(req, res) {
     let account = null;
     if (customerId) account = await prisma.customer.findUnique({ where: { id: customerId } });
 
+    const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || null;
+    const effectivePhone = (account?.phone) || customerPhone || null;
+    const effectiveEmail = (account?.email) || customerEmail || null;
+
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const recentCount = await prisma.order.count({
+      where: {
+        createdAt: { gt: oneHourAgo },
+        OR: [
+          ...(effectivePhone ? [{ customerPhone: effectivePhone }] : []),
+          ...(effectiveEmail ? [{ customerEmail: effectiveEmail }] : []),
+          ...(ip ? [{ ipAddress: ip }] : [])
+        ]
+      }
+    });
+    if (recentCount >= 5) {
+      return res.status(429).json({ error: 'Has hecho varios pedidos en la última hora. Espera un poco o contáctanos directo por WhatsApp para seguir comprando.' });
+    }
+
     const lines = [];
     for (const raw of items) {
       const id = parseInt(raw.id);
@@ -66,6 +85,7 @@ export default async function handler(req, res) {
         customerPhone: (account?.phone) || customerPhone || null,
         customerEmail: (account?.email) || customerEmail || null,
         customerId: account?.id || null,
+        ipAddress: ip,
         items: { create: lines.map(l => ({ inventoryId: l.id, name: l.name, qty: l.qty, priceUsd: l.priceUsd })) }
       },
       include: { items: true }

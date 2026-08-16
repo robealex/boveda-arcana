@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma';
 import { checkAdmin } from '../../lib/auth';
+import { sendStockAlertEmails } from '../../lib/sendEmail';
 
 function serialize(item, reservedMap, isAdmin) {
   const reserved = reservedMap?.get(item.id) || 0;
@@ -85,12 +86,20 @@ export default async function handler(req, res) {
     if (!isAdmin) return res.status(401).json({ error: 'Password de administrador incorrecto' });
     const { id } = req.query;
     if (!id) return res.status(400).json({ error: 'Falta id' });
+    const before = await prisma.inventory.findUnique({ where: { id: parseInt(id) } });
     const data = buildData(req.body);
     const item = await prisma.inventory.update({ where: { id: parseInt(id) }, data });
     if (data.price !== undefined) {
       await prisma.priceSnapshot.create({
         data: { inventoryId: item.id, myPrice: item.price, refPrice: req.body.ref_usd || null }
       });
+    }
+    if (before && before.qty <= 0 && data.qty !== undefined && data.qty > 0) {
+      const alerts = await prisma.stockAlert.findMany({ where: { inventoryId: item.id, notified: false } });
+      if (alerts.length > 0) {
+        sendStockAlertEmails(item, alerts.map(a => a.email)).catch(() => {});
+        await prisma.stockAlert.updateMany({ where: { inventoryId: item.id, notified: false }, data: { notified: true } });
+      }
     }
     return res.status(200).json({ item: serialize(item, null, true) });
   }

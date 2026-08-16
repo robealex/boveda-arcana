@@ -7,6 +7,17 @@ datasource db {
   url      = env("DATABASE_POSTGRES_URL")
 }
 
+model StockAlert {
+  id          Int       @id @default(autoincrement())
+  inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  inventoryId Int       @map("inventory_id")
+  email       String
+  notified    Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@map("stock_alerts")
+}
+
 model Inventory {
   id            Int      @id @default(autoincrement())
   name          String
@@ -28,6 +39,7 @@ model Inventory {
   createdAt     DateTime @default(now()) @map("created_at")
   orderItems    OrderItem[]
   priceHistory  PriceSnapshot[]
+  stockAlerts   StockAlert[]
 
   @@map("inventory")
 }
@@ -68,6 +80,7 @@ model Order {
   customerEmail String?     @map("customer_email")
   customer      Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
   customerId    Int?        @map("customer_id")
+  ipAddress     String?     @map("ip_address")
   createdAt     DateTime    @default(now()) @map("created_at")
   items         OrderItem[]
 

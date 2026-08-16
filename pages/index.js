@@ -16,6 +16,8 @@ export default function Home() {
   const [rarityFilter, setRarityFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [detailItem, setDetailItem] = useState(null);
+  const [alertEmail, setAlertEmail] = useState('');
+  const [alertSent, setAlertSent] = useState(false);
   const [account, setAccount] = useState(null);
   const [checkoutForm, setCheckoutForm] = useState({ name: '', phone: '', email: '' });
   const [showCheckoutForm, setShowCheckoutForm] = useState(false);
@@ -52,12 +54,24 @@ export default function Home() {
 
   useEffect(() => {
     if (!detailItem) return;
+    setAlertEmail('');
+    setAlertSent(false);
     fetch('/api/track-view', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: detailItem.id })
     }).catch(() => {});
   }, [detailItem?.id]);
+
+  async function submitStockAlert() {
+    if (!alertEmail.trim()) return;
+    const r = await fetch('/api/stock-alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inventoryId: detailItem.id, email: alertEmail.trim() })
+    });
+    if (r.ok) setAlertSent(true);
+  }
 
   const visible = items
     .filter(it => it.name.toLowerCase().includes(filter.toLowerCase()))
@@ -406,6 +420,18 @@ export default function Home() {
             >
               {detailItem.qty <= 0 ? 'Agotado' : 'Agregar al carrito'}
             </button>
+            {detailItem.qty <= 0 && (
+              <div style={{ marginTop: 10 }}>
+                {alertSent ? (
+                  <p className="hint" style={{ color: 'var(--teal)' }}>Listo, te avisamos por correo cuando vuelva a haber.</p>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input placeholder="Tu correo" value={alertEmail} onChange={e => setAlertEmail(e.target.value)} style={{ flex: 1 }} />
+                    <button className="ghost" onClick={submitStockAlert}>Avísame</button>
+                  </div>
+                )}
+              </div>
+            )}
             {detailItem.scryfallUri && (
               <p className="hint" style={{ marginTop: 10 }}>
                 <a href={detailItem.scryfallUri} target="_blank" rel="noreferrer" style={{ color: 'var(--gold)' }}>Ver ficha completa y gráfica de precio en Scryfall ↗</a>
