@@ -844,7 +844,12 @@ export default function Admin() {
                       </td>
                       <td><input value={e.name ?? ''} onChange={ev => updateRowEdit(it.id, 'name', ev.target.value)} style={{ minWidth: 160 }} /></td>
                       <td><input value={e.set_name ?? ''} onChange={ev => updateRowEdit(it.id, 'set_name', ev.target.value)} style={{ minWidth: 130 }} /></td>
-                      <td><input type="number" value={e.price ?? ''} onChange={ev => updateRowEdit(it.id, 'price', ev.target.value)} style={{ width: 80 }} /></td>
+                      <td>
+                        <input type="number" value={e.price ?? ''} onChange={ev => updateRowEdit(it.id, 'price', ev.target.value)} style={{ width: 80 }} />
+                        {rate && e.price !== '' && !isNaN(parseFloat(e.price)) && (
+                          <div className="hint" style={{ fontSize: '0.7rem', marginTop: 2 }}>≈${(parseFloat(e.price) * rate).toFixed(2)} MXN</div>
+                        )}
+                      </td>
                       <td><input type="number" value={e.qty ?? ''} onChange={ev => updateRowEdit(it.id, 'qty', ev.target.value)} style={{ width: 60 }} /></td>
                       <td>
                         <select value={e.condition ?? 'Near Mint'} onChange={ev => updateRowEdit(it.id, 'condition', ev.target.value)}>
@@ -1110,7 +1115,13 @@ export default function Admin() {
             <div className="field"><label>URL de imagen</label><input value={modalItem.img} onChange={e => setModalItem(m => ({ ...m, img: e.target.value }))} /></div>
 
             <div style={{ display: 'flex', gap: 10 }}>
-              <div className="field" style={{ flex: 1 }}><label>Precio (USD)</label><input type="number" value={modalItem.price} onChange={e => setModalItem(m => ({ ...m, price: e.target.value }))} /></div>
+              <div className="field" style={{ flex: 1 }}>
+                <label>Precio (USD)</label>
+                <input type="number" value={modalItem.price} onChange={e => setModalItem(m => ({ ...m, price: e.target.value }))} />
+                {rate && modalItem.price !== '' && !isNaN(parseFloat(modalItem.price)) && (
+                  <p className="hint" style={{ marginTop: 4, marginBottom: 0 }}>≈ ${(parseFloat(modalItem.price) * rate).toFixed(2)} MXN</p>
+                )}
+              </div>
               <div className="field" style={{ flex: 1 }}><label>Cantidad</label><input type="number" value={modalItem.qty} onChange={e => setModalItem(m => ({ ...m, qty: e.target.value }))} /></div>
             </div>
 

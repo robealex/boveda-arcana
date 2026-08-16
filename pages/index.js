@@ -20,6 +20,20 @@ export default function Home() {
     if (!pricingSettings) return 100;
     return pricingSettings[CONDITION_FIELD[condition]] ?? 100;
   }
+
+  function discountInfo(it) {
+    const price = Number(it.price);
+    if (it.originalPrice && it.originalPrice > price) {
+      const pctOff = Math.round((1 - price / it.originalPrice) * 100);
+      return { refPrice: Number(it.originalPrice), pctOff };
+    }
+    const pct = pctFor(it.condition);
+    if (pct < 100) {
+      const refPrice = price / (pct / 100);
+      return { refPrice, pctOff: 100 - pct };
+    }
+    return null;
+  }
   const [sortBy, setSortBy] = useState('newest');
   const [colorFilter, setColorFilter] = useState([]);
   const [rarityFilter, setRarityFilter] = useState('');
@@ -267,18 +281,23 @@ export default function Home() {
         <div className="grid">
           {pagedVisible.map(it => {
             const soldOut = it.qty <= 0;
+            const disc = discountInfo(it);
             return (
-              <div className="card" key={it.id} style={{ opacity: soldOut ? 0.55 : 1, cursor: 'pointer' }} onClick={() => setDetailItem(it)}>
+              <div className="card" key={it.id} style={{ opacity: soldOut ? 0.55 : 1, cursor: 'pointer', position: 'relative' }} onClick={() => setDetailItem(it)}>
                 <div className="art">{it.img && <img src={it.img} alt={it.name} />}</div>
+                {disc && !soldOut && (
+                  <span style={{ position: 'absolute', top: 8, right: 8, background: 'var(--blood)', color: 'var(--parchment)', fontWeight: 800, fontSize: '0.8rem', padding: '4px 9px', borderRadius: 999, zIndex: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
+                    -{disc.pctOff}%
+                  </span>
+                )}
                 <div className="info">
                   {soldOut ? <span className="badge" style={{ background: 'var(--muted)' }}>Agotado</span> : it.qty <= 2 && <span className="badge">Últimas {it.qty}</span>}
-                  {it.originalPrice && it.originalPrice > it.price && <span className="badge" style={{ background: 'var(--teal)', marginLeft: it.qty <= 2 || soldOut ? 6 : 0 }}>Oferta</span>}
                   <div className="name"><CardBadges it={it} /> {it.name}</div>
-                  <div className="set">{it.condition}{pctFor(it.condition) < 100 ? ` (${pctFor(it.condition)}% valor NM)` : ''}</div>
-                  {it.originalPrice && it.originalPrice > it.price && rate && (
-                    <div className="hint" style={{ textDecoration: 'line-through', marginBottom: -4 }}>${mxn(Number(it.originalPrice)).toFixed(2)} MXN</div>
+                  <div className="set">{it.condition}</div>
+                  {disc && rate && (
+                    <div className="hint" style={{ textDecoration: 'line-through', marginBottom: -4 }}>${mxn(disc.refPrice).toFixed(2)} MXN</div>
                   )}
-                  <div className="price mono">{rate ? `$${mxn(Number(it.price)).toFixed(2)} MXN` : 'Cargando precio...'}</div>
+                  <div className="price mono" style={disc ? { color: 'var(--blood)' } : {}}>{rate ? `$${mxn(Number(it.price)).toFixed(2)} MXN` : 'Cargando precio...'}</div>
                   <div className="hint" style={{ marginTop: -4 }}>${Number(it.price).toFixed(2)} USD</div>
                   <button className="primary" disabled={soldOut} style={soldOut ? { opacity: 0.5, cursor: 'not-allowed' } : {}} onClick={e => { e.stopPropagation(); addToCart(it); }}>
                     {soldOut ? 'Agotado' : 'Agregar'}
@@ -301,6 +320,7 @@ export default function Home() {
             <tbody>
               {pagedVisible.map(it => {
                 const soldOut = it.qty <= 0;
+                const disc = discountInfo(it);
                 return (
                   <tr key={it.id} style={{ opacity: soldOut ? 0.5 : 1 }}>
                     <td>
@@ -312,11 +332,11 @@ export default function Home() {
                       )}
                     </td>
                     <td style={{ cursor: 'pointer' }} onClick={() => setDetailItem(it)}>
-                      <CardBadges it={it} /> {it.name}
+                      <CardBadges it={it} /> {it.name} {disc && !soldOut && <span style={{ background: 'var(--blood)', color: 'var(--parchment)', fontWeight: 700, fontSize: '0.7rem', padding: '2px 6px', borderRadius: 999, marginLeft: 6 }}>-{disc.pctOff}%</span>}
                     </td>
                     <td className="hint">{it.setName}</td>
-                    <td className="hint">{it.condition}{pctFor(it.condition) < 100 ? ` (${pctFor(it.condition)}%)` : ''}</td>
-                    <td className="mono">{rate ? `$${mxn(Number(it.price)).toFixed(2)} MXN` : '...'}</td>
+                    <td className="hint">{it.condition}</td>
+                    <td className="mono" style={disc ? { color: 'var(--blood)' } : {}}>{rate ? `$${mxn(Number(it.price)).toFixed(2)} MXN` : '...'}</td>
                     <td>{soldOut ? <span style={{ color: 'var(--blood)' }}>Agotado</span> : it.qty}</td>
                     <td>
                       <button className="ghost" disabled={soldOut} style={soldOut ? { opacity: 0.5 } : {}} onClick={() => addToCart(it)}>
@@ -408,16 +428,23 @@ export default function Home() {
         <div className="modal-bg show" onClick={() => setDetailItem(null)}>
           <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
             {detailItem.img && <img src={detailItem.img} alt={detailItem.name} style={{ width: '100%', borderRadius: 8, marginBottom: 14 }} />}
-            <h3 style={{ marginTop: 0, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>{detailItem.foil && <span className="foil-badge" title="Foil" />}{detailItem.name}</h3>
-            <p className="hint" style={{ marginTop: 0 }}>{detailItem.setName} · {detailItem.condition}{pctFor(detailItem.condition) < 100 ? ` (${pctFor(detailItem.condition)}% del valor Near Mint)` : ''} · {LANGUAGES[detailItem.language] || detailItem.language}</p>
+            <h3 style={{ marginTop: 0, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+              {detailItem.foil && <span className="foil-badge" title="Foil" />}{detailItem.name}
+              {discountInfo(detailItem) && detailItem.qty > 0 && (
+                <span style={{ background: 'var(--blood)', color: 'var(--parchment)', fontWeight: 800, fontSize: '0.75rem', padding: '3px 9px', borderRadius: 999 }}>
+                  -{discountInfo(detailItem).pctOff}%
+                </span>
+              )}
+            </h3>
+            <p className="hint" style={{ marginTop: 0 }}>{detailItem.setName} · {detailItem.condition} · {LANGUAGES[detailItem.language] || detailItem.language}</p>
             {detailItem.typeLine && <p style={{ fontSize: '0.85rem', margin: '6px 0' }}>{detailItem.typeLine}</p>}
             <div style={{ display: 'flex', gap: 12, fontSize: '0.8rem', color: 'var(--muted)', marginBottom: 14 }}>
               {detailItem.colors && <span>Colores: {detailItem.colors.split(',').filter(Boolean).join(', ') || 'Incoloro'}</span>}
               {detailItem.rarity && <span>Rareza: {detailItem.rarity}</span>}
             </div>
-            <div className="price mono" style={{ fontSize: '1.3rem' }}>
-              {detailItem.originalPrice && detailItem.originalPrice > detailItem.price && rate && (
-                <span style={{ textDecoration: 'line-through', color: 'var(--muted)', fontSize: '1rem', marginRight: 8 }}>${mxn(Number(detailItem.originalPrice)).toFixed(2)}</span>
+            <div className="price mono" style={{ fontSize: '1.3rem', color: discountInfo(detailItem) ? 'var(--blood)' : 'var(--gold)' }}>
+              {discountInfo(detailItem) && rate && (
+                <span style={{ textDecoration: 'line-through', color: 'var(--muted)', fontSize: '1rem', marginRight: 8 }}>${mxn(discountInfo(detailItem).refPrice).toFixed(2)}</span>
               )}
               {rate ? `$${mxn(Number(detailItem.price)).toFixed(2)} MXN` : '...'}
             </div>
