@@ -249,6 +249,12 @@ export default function Admin() {
     });
   }
 
+  function impliedRefUsd(it) {
+    const pct = pctFor(it.condition || 'Near Mint');
+    if (!pct || pct <= 0) return Number(it.price);
+    return (Number(it.price) / (pct / 100)).toFixed(2);
+  }
+
   function openEditModal(it) {
     setModalItem({
       mode: 'edit', id: it.id,
@@ -259,7 +265,7 @@ export default function Admin() {
       rarity: it.rarity || '', type_line: it.typeLine || '',
       foil: Boolean(it.foil), language: it.language || 'en',
       stripe_link: it.stripeLink || '', scryfall_uri: it.scryfallUri || '',
-      notes: it.notes || '', ref_usd: null
+      notes: it.notes || '', ref_usd: impliedRefUsd(it)
     });
   }
 
@@ -273,7 +279,7 @@ export default function Admin() {
       rarity: it.rarity || '', type_line: it.typeLine || '',
       foil: Boolean(it.foil), language: it.language || 'en',
       stripe_link: it.stripeLink || '', scryfall_uri: it.scryfallUri || '',
-      notes: '', ref_usd: null
+      notes: '', ref_usd: impliedRefUsd(it)
     });
   }
 
