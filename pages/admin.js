@@ -136,11 +136,6 @@ export default function Admin() {
   }
 
   const [stats, setStats] = useState(null);
-  useEffect(() => {
-    if (authed && view === 'stats') {
-      fetch('/api/stats', { headers: { 'x-admin-password': pw } }).then(r => r.json()).then(setStats);
-    }
-  }, [authed, view]);
 
 
   useEffect(() => {
@@ -292,6 +287,11 @@ export default function Admin() {
 
   useEffect(() => { if (authed && view === 'orders') loadOrders(); }, [authed, view]);
   useEffect(() => { if (authed && view === 'users') loadCustomers(); }, [authed, view]);
+  useEffect(() => {
+    if (authed && view === 'stats') {
+      fetch('/api/stats', { headers: { 'x-admin-password': pw } }).then(r => r.json()).then(setStats);
+    }
+  }, [authed, view]);
 
   const [customers, setCustomers] = useState([]);
   const [editingCustomer, setEditingCustomer] = useState(null);
