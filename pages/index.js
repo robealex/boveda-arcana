@@ -228,6 +228,7 @@ export default function Home() {
         <h1>Bóveda Arcana</h1>
         <p className="sub">Cartas de Magic: The Gathering en venta{SHOP_OWNER ? ` · por ${SHOP_OWNER}` : ''}. Selecciona las que quieras y te contactamos para cerrar la venta.</p>
         <div style={{ marginTop: 10, display: 'flex', gap: 16, justifyContent: 'center', fontSize: '0.85rem', flexWrap: 'wrap' }}>
+          <a href="/decks" style={{ color: 'var(--gold)' }}>Ver mazos completos →</a>
           <a href="/mis-pedidos" style={{ color: 'var(--gold)' }}>Ver el estatus de mis pedidos →</a>
           {account ? (
             <>

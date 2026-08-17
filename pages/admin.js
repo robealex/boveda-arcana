@@ -358,6 +358,132 @@ export default function Admin() {
     }
   }, [authed, view]);
 
+  // ---------- Decks ----------
+  const [decks, setDecks] = useState([]);
+  const [deckForm, setDeckForm] = useState(null); // null = oculto, {} = formulario abierto
+  const [deckCards, setDeckCards] = useState([]); // [{name, qty, img, inventoryId, status}]
+  const [deckImporting, setDeckImporting] = useState(false);
+  const [deckPasteText, setDeckPasteText] = useState('');
+  const [moxfieldUrl, setMoxfieldUrl] = useState('');
+  const [coverQuery, setCoverQuery] = useState('');
+
+  function loadDecks() {
+    fetch('/api/decks?all=1', { headers: { 'x-admin-password': pw } }).then(r => r.json()).then(d => setDecks(d.decks || []));
+  }
+  useEffect(() => { if (authed && view === 'decks') loadDecks(); }, [authed, view]);
+
+  function openNewDeckForm() {
+    setDeckForm({ name: '', price: '', description: '', coverImg: '', coverName: '' });
+    setDeckCards([]);
+    setDeckPasteText('');
+    setMoxfieldUrl('');
+    setCoverQuery('');
+  }
+
+  async function searchCoverCard() {
+    if (!coverQuery.trim()) return;
+    const r = await fetch('/api/card-lookup?name=' + encodeURIComponent(coverQuery));
+    const d = await r.json();
+    if (!r.ok) { alert(d.error || 'No se encontró esa carta'); return; }
+    setDeckForm(f => ({ ...f, coverImg: d.img, coverName: d.name }));
+  }
+
+  function parseDeckList(text) {
+    return text.split('\n').map(line => line.trim()).filter(Boolean).map(line => {
+      const m = line.match(/^(\d+)x?\s+(.+)$/i);
+      if (m) return { name: m[2].trim(), qty: parseInt(m[1]) };
+      return { name: line, qty: 1 };
+    });
+  }
+
+  async function lookupCard(name) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const r = await fetch('/api/card-lookup?name=' + encodeURIComponent(name), { signal: controller.signal });
+      const d = await r.json();
+      clearTimeout(timer);
+      return r.ok ? d : null;
+    } catch (e) {
+      clearTimeout(timer);
+      return null;
+    }
+  }
+
+  async function processDeckPaste() {
+    const parsed = parseDeckList(deckPasteText);
+    if (parsed.length === 0) { alert('Pega al menos una carta.'); return; }
+    setDeckImporting(true);
+    const rows = parsed.map(p => ({ ...p, img: '', status: 'pending' }));
+    setDeckCards(rows);
+    for (let i = 0; i < rows.length; i++) {
+      const found = await lookupCard(rows[i].name);
+      const matchInv = items.find(it => it.name.toLowerCase() === rows[i].name.toLowerCase());
+      setDeckCards(prev => prev.map((r, idx) => idx === i ? {
+        ...r, name: found?.name || r.name, img: found?.img || '', inventoryId: matchInv?.id || null, status: 'done'
+      } : r));
+      await new Promise(res => setTimeout(res, 100));
+    }
+    setDeckImporting(false);
+  }
+
+  async function importFromMoxfield() {
+    if (!moxfieldUrl.trim()) return;
+    setDeckImporting(true);
+    const r = await fetch('/api/moxfield-import', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
+      body: JSON.stringify({ url: moxfieldUrl })
+    });
+    const d = await r.json();
+    setDeckImporting(false);
+    if (!r.ok) { alert(d.error || 'Error al importar'); return; }
+    setDeckForm(f => ({ ...f, name: f.name || d.name, coverImg: d.coverImg, coverName: d.coverName }));
+    const withInv = d.cards.map(c => {
+      const matchInv = items.find(it => it.name.toLowerCase() === c.name.toLowerCase());
+      return { ...c, inventoryId: matchInv?.id || null, status: 'done' };
+    });
+    setDeckCards(withInv);
+  }
+
+  async function saveDeck() {
+    if (!deckForm.name.trim()) { alert('Ponle nombre al deck.'); return; }
+    if (!deckForm.price || isNaN(parseFloat(deckForm.price))) { alert('Precio inválido.'); return; }
+    if (deckCards.length === 0) { alert('Agrega al menos una carta al deck (pega la lista o importa de Moxfield).'); return; }
+    const r = await fetch('/api/decks', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
+      body: JSON.stringify({
+        name: deckForm.name, description: deckForm.description, price: parseFloat(deckForm.price),
+        coverImg: deckForm.coverImg, coverName: deckForm.coverName, moxfieldUrl: moxfieldUrl || null,
+        cards: deckCards.map(c => ({ name: c.name, qty: c.qty, img: c.img, inventoryId: c.inventoryId }))
+      })
+    });
+    if (!r.ok) { const d = await r.json(); alert(d.error || 'Error al guardar'); return; }
+    setDeckForm(null);
+    loadDecks();
+  }
+
+  async function toggleDeckStatus(deck) {
+    const action = deck.active ? 'mark_sold' : 'reactivate';
+    const msg = deck.active
+      ? '¿Marcar este deck como vendido? Se van a descontar del inventario las cartas que coincidan con tu catálogo.'
+      : '¿Reactivar este deck? Se van a regresar al inventario las cartas que se habían descontado.';
+    if (!confirm(msg)) return;
+    const r = await fetch(`/api/decks/${deck.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
+      body: JSON.stringify({ action })
+    });
+    if (!r.ok) { const d = await r.json(); alert(d.error || 'Error'); return; }
+    loadDecks();
+    loadInventory();
+  }
+
+  async function deleteDeck(id) {
+    if (!confirm('¿Eliminar este deck? No afecta tu inventario de cartas sueltas.')) return;
+    const r = await fetch(`/api/decks/${id}`, { method: 'DELETE', headers: { 'x-admin-password': pw } });
+    if (!r.ok) { alert('Error al eliminar'); return; }
+    loadDecks();
+  }
+
   const [customers, setCustomers] = useState([]);
   const [editingCustomer, setEditingCustomer] = useState(null);
 
@@ -592,6 +718,7 @@ export default function Admin() {
         <button className={`tab-btn ${view === 'users' ? 'active' : ''}`} onClick={() => setView('users')}>Usuarios</button>
         <button className={`tab-btn ${view === 'stats' ? 'active' : ''}`} onClick={() => setView('stats')}>Estadísticas</button>
         <button className={`tab-btn ${view === 'pricing' ? 'active' : ''}`} onClick={() => setView('pricing')}>Precios</button>
+        <button className={`tab-btn ${view === 'decks' ? 'active' : ''}`} onClick={() => setView('decks')}>Decks</button>
       </div>
 
       {view === 'inventory' && (
@@ -1108,6 +1235,95 @@ export default function Admin() {
                 </div>
               ))}
             </>
+          )}
+        </div>
+      )}
+
+      {view === 'decks' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h3 style={{ margin: 0 }}>Decks ({decks.length})</h3>
+            {!deckForm && <button className="primary" onClick={openNewDeckForm}>+ Nuevo deck</button>}
+          </div>
+
+          {!deckForm && (
+            <div className="grid">
+              {decks.map(d => (
+                <div className="card" key={d.id} style={{ opacity: d.active ? 1 : 0.5 }}>
+                  <div className="art">{d.coverImg && <img src={d.coverImg} alt={d.name} />}</div>
+                  <div className="info">
+                    <div className="name">{d.name}</div>
+                    <div className="set">{d.cardCount} cartas · {d.active ? 'Disponible' : 'Vendido / apagado'}</div>
+                    <div className="price mono">${Number(d.price).toFixed(2)} USD{rate ? ` · ≈$${(Number(d.price) * rate).toFixed(2)} MXN` : ''}</div>
+                    <div className="row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button className="ghost" style={{ flex: 1 }} onClick={() => toggleDeckStatus(d)}>{d.active ? 'Marcar vendido' : 'Reactivar'}</button>
+                      <button className="ghost" style={{ flex: 1 }} onClick={() => deleteDeck(d.id)}>Eliminar</button>
+                    </div>
+                    <a href={`/decks/${d.id}`} target="_blank" rel="noreferrer"><button className="ghost" style={{ width: '100%', marginTop: 6 }}>Ver página pública</button></a>
+                  </div>
+                </div>
+              ))}
+              {decks.length === 0 && <p className="hint">Todavía no tienes decks. Dale a "+ Nuevo deck" para armar el primero.</p>}
+            </div>
+          )}
+
+          {deckForm && (
+            <div style={{ maxWidth: 520 }}>
+              <h4>Datos del deck</h4>
+              <div className="field"><label>Nombre del deck</label><input value={deckForm.name} onChange={e => setDeckForm(f => ({ ...f, name: e.target.value }))} /></div>
+              <div className="field"><label>Precio de venta (USD, todo el deck)</label><input type="number" value={deckForm.price} onChange={e => setDeckForm(f => ({ ...f, price: e.target.value }))} /></div>
+              <div className="field"><label>Descripción (opcional)</label><input value={deckForm.description} onChange={e => setDeckForm(f => ({ ...f, description: e.target.value }))} /></div>
+
+              <div className="field">
+                <label>Carta de portada (ej. el comandante)</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input value={coverQuery} onChange={e => setCoverQuery(e.target.value)} placeholder="Nombre de la carta de portada" />
+                  <button className="ghost" onClick={searchCoverCard}>Buscar</button>
+                </div>
+                {deckForm.coverImg && (
+                  <div style={{ marginTop: 8 }}>
+                    <img src={deckForm.coverImg} alt={deckForm.coverName} style={{ width: 100, borderRadius: 6 }} />
+                    <p className="hint">{deckForm.coverName}</p>
+                  </div>
+                )}
+              </div>
+
+              <hr style={{ border: 'none', borderTop: '1px solid var(--line)', margin: '20px 0' }} />
+
+              <h4>Lista de cartas</h4>
+              <div className="field">
+                <label>Importar desde Moxfield (opcional)</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input value={moxfieldUrl} onChange={e => setMoxfieldUrl(e.target.value)} placeholder="https://moxfield.com/decks/..." />
+                  <button className="ghost" onClick={importFromMoxfield} disabled={deckImporting}>{deckImporting ? 'Importando...' : 'Importar'}</button>
+                </div>
+                <p className="hint" style={{ marginTop: 4 }}>Puede fallar si Moxfield cambia su sistema o el deck es privado — si pasa, usa la opción de pegar lista abajo.</p>
+              </div>
+
+              <div className="field">
+                <label>O pega la lista a mano (una carta por línea, ej. "1 Sol Ring")</label>
+                <textarea value={deckPasteText} onChange={e => setDeckPasteText(e.target.value)} rows={6}
+                  style={{ width: '100%', background: 'var(--ink2)', border: '1px solid var(--line)', color: 'var(--parchment)', borderRadius: 'var(--radius)', padding: '10px 12px', fontFamily: 'monospace', fontSize: '0.85rem' }} />
+                <button className="ghost" style={{ marginTop: 8 }} onClick={processDeckPaste} disabled={deckImporting}>{deckImporting ? 'Buscando cartas...' : 'Procesar lista'}</button>
+              </div>
+
+              {deckCards.length > 0 && (
+                <div style={{ marginTop: 16, maxHeight: 260, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8, padding: 10 }}>
+                  {deckCards.map((c, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: '0.85rem' }}>
+                      {c.img && <img src={c.img} style={{ width: 24, height: 33, objectFit: 'cover', borderRadius: 3 }} />}
+                      <span style={{ flex: 1 }}>{c.qty}x {c.name}</span>
+                      {c.inventoryId ? <span className="hint" style={{ color: 'var(--teal)' }}>vinculada a inventario</span> : <span className="hint">no está en tu inventario</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                <button className="primary" onClick={saveDeck}>Guardar deck</button>
+                <button className="ghost" onClick={() => setDeckForm(null)}>Cancelar</button>
+              </div>
+            </div>
           )}
         </div>
       )}
