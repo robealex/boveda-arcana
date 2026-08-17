@@ -57,6 +57,7 @@ En tu proyecto de Vercel: **Settings → Environment Variables**, agrega estas
 | `RESEND_API_KEY` | para que te lleguen correos de nuevos pedidos (ver abajo) | `re_xxxxxxxx` |
 | `CUSTOMER_JWT_SECRET` | cualquier texto largo y aleatorio, para las sesiones de cuenta de cliente | `una-frase-larga-y-random-123` |
 | `NEXT_PUBLIC_SITE_URL` | opcional — tu URL pública, para que los links de recuperar contraseña apunten bien | `https://boveda-arcana.vercel.app` |
+| `NEXT_PUBLIC_GTM_ID` | opcional — tu ID de Google Tag Manager | `GTM-XXXXXXX` |
 
 ### Correos de pedidos (Resend)
 
