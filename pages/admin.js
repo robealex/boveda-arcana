@@ -373,10 +373,26 @@ export default function Admin() {
   useEffect(() => { if (authed && view === 'decks') loadDecks(); }, [authed, view]);
 
   function openNewDeckForm() {
-    setDeckForm({ name: '', price: '', originalPrice: '', description: '', coverImg: '', coverName: '' });
+    setDeckForm({ id: null, name: '', price: '', originalPrice: '', description: '', coverImg: '', coverName: '' });
     setDeckCards([]);
     setDeckPasteText('');
     setMoxfieldUrl('');
+    setCoverQuery('');
+  }
+
+  function editDeck(d) {
+    setDeckForm({
+      id: d.id, name: d.name, price: String(d.price),
+      originalPrice: d.originalPrice !== null ? String(d.originalPrice) : '',
+      description: d.description || '', coverImg: d.coverImg || '', coverName: d.coverName || ''
+    });
+    setDeckCards(d.cards.map(c => ({
+      name: c.name, qty: c.qty, img: c.img || '', colors: c.colors || '', cmc: c.cmc,
+      price: c.price !== null && c.price !== undefined ? Number(c.price) : null,
+      inventoryId: c.inventoryId, status: c.img ? 'done' : 'notfound'
+    })));
+    setDeckPasteText('');
+    setMoxfieldUrl(d.moxfieldUrl || '');
     setCoverQuery('');
   }
 
@@ -515,14 +531,17 @@ export default function Admin() {
     if (!deckForm.name.trim()) { alert('Ponle nombre al deck.'); return; }
     if (!deckForm.price || isNaN(parseFloat(deckForm.price))) { alert('Precio inválido.'); return; }
     if (deckCards.length === 0) { alert('Agrega al menos una carta al deck (pega la lista o importa de Moxfield).'); return; }
-    const r = await fetch('/api/decks', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
-      body: JSON.stringify({
-        name: deckForm.name, description: deckForm.description, price: parseFloat(deckForm.price),
-        originalPrice: deckForm.originalPrice ? parseFloat(deckForm.originalPrice) : null,
-        coverImg: deckForm.coverImg, coverName: deckForm.coverName, moxfieldUrl: moxfieldUrl || null,
-        cards: deckCards.map(c => ({ name: c.name, qty: c.qty, img: c.img, colors: c.colors, cmc: c.cmc, price: c.price, inventoryId: c.inventoryId }))
-      })
+    const payload = {
+      name: deckForm.name, description: deckForm.description, price: parseFloat(deckForm.price),
+      originalPrice: deckForm.originalPrice ? parseFloat(deckForm.originalPrice) : null,
+      coverImg: deckForm.coverImg, coverName: deckForm.coverName, moxfieldUrl: moxfieldUrl || null,
+      cards: deckCards.map(c => ({ name: c.name, qty: c.qty, img: c.img, colors: c.colors, cmc: c.cmc, price: c.price, inventoryId: c.inventoryId }))
+    };
+    const url = deckForm.id ? `/api/decks/${deckForm.id}` : '/api/decks';
+    const method = deckForm.id ? 'PATCH' : 'POST';
+    const r = await fetch(url, {
+      method, headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
+      body: JSON.stringify(payload)
     });
     if (!r.ok) { const d = await r.json(); alert(d.error || 'Error al guardar'); return; }
     setDeckForm(null);
@@ -1326,6 +1345,7 @@ export default function Admin() {
                     )}
                     <div className="price mono">${Number(d.price).toFixed(2)} USD{rate ? ` · ≈$${(Number(d.price) * rate).toFixed(2)} MXN` : ''}</div>
                     <div className="row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button className="ghost" style={{ flex: 1 }} onClick={() => editDeck(d)}>Editar</button>
                       <button className="ghost" style={{ flex: 1 }} onClick={() => toggleDeckStatus(d)}>{d.active ? 'Marcar vendido' : 'Reactivar'}</button>
                       <button className="ghost" style={{ flex: 1 }} onClick={() => deleteDeck(d.id)}>Eliminar</button>
                     </div>

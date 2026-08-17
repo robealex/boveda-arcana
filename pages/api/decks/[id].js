@@ -36,8 +36,8 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, affected: linked.length });
     }
 
-    // Edición general de datos del deck
-    const { name, description, coverImg, coverName, price, originalPrice } = req.body;
+    // Edición general de datos del deck (y opcionalmente su lista de cartas completa)
+    const { name, description, coverImg, coverName, price, originalPrice, cards } = req.body;
     const data = {};
     if (name !== undefined) data.name = name;
     if (description !== undefined) data.description = description;
@@ -45,6 +45,22 @@ export default async function handler(req, res) {
     if (coverName !== undefined) data.coverName = coverName;
     if (price !== undefined) data.price = price;
     if (originalPrice !== undefined) data.originalPrice = originalPrice;
+
+    if (Array.isArray(cards)) {
+      await prisma.$transaction([
+        prisma.deckCard.deleteMany({ where: { deckId } }),
+        prisma.deck.update({
+          where: { id: deckId },
+          data: {
+            ...data,
+            cards: { create: cards.map(c => ({ name: c.name, qty: c.qty || 1, img: c.img || null, colors: c.colors || null, cmc: c.cmc ?? null, price: c.price ?? null, inventoryId: c.inventoryId || null })) }
+          }
+        })
+      ]);
+      const updated = await prisma.deck.findUnique({ where: { id: deckId }, include: { cards: true } });
+      return res.status(200).json({ deck: { ...updated, price: Number(updated.price) } });
+    }
+
     const updated = await prisma.deck.update({ where: { id: deckId }, data });
     return res.status(200).json({ deck: { ...updated, price: Number(updated.price) } });
   }
