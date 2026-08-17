@@ -10,7 +10,7 @@ export default async function handler(req, res) {
       include: { cards: true }
     });
     return res.status(200).json({
-      decks: decks.map(d => ({ ...d, price: Number(d.price), cardCount: d.cards.reduce((s, c) => s + c.qty, 0) }))
+      decks: decks.map(d => ({ ...d, price: Number(d.price), originalPrice: d.originalPrice !== null ? Number(d.originalPrice) : null, cardCount: d.cards.reduce((s, c) => s + c.qty, 0) }))
     });
   }
 
