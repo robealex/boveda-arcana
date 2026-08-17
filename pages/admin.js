@@ -389,6 +389,8 @@ export default function Admin() {
     setDeckCards(d.cards.map(c => ({
       name: c.name, qty: c.qty, img: c.img || '', colors: c.colors || '', cmc: c.cmc,
       price: c.price !== null && c.price !== undefined ? Number(c.price) : null,
+      refUsd: c.price !== null && c.price !== undefined ? Number(c.price) : null,
+      condition: 'Near Mint',
       inventoryId: c.inventoryId, status: c.img ? 'done' : 'notfound'
     })));
     setDeckPasteText('');
@@ -433,13 +435,35 @@ export default function Admin() {
     }
   }
 
+  function updateDeckCardRow(idx, patch) {
+    setDeckCards(prev => {
+      const next = prev.map((r, i) => i === idx ? { ...r, ...patch } : r);
+      recalcSuggestedPrice(next);
+      return next;
+    });
+  }
+
+  function changeRowCondition(idx, newCond) {
+    setDeckCards(prev => {
+      const next = prev.map((r, i) => {
+        if (i !== idx) return r;
+        const newPrice = r.refUsd ? (parseFloat(r.refUsd) * pctFor(newCond) / 100).toFixed(2) : r.price;
+        return { ...r, condition: newCond, price: newPrice };
+      });
+      recalcSuggestedPrice(next);
+      return next;
+    });
+  }
+
   async function resolveRow(row) {
     const found = await lookupCard(row.name);
     const matchInv = items.find(it => it.name.toLowerCase() === row.name.toLowerCase());
     if (!found) return { ...row, status: 'notfound' };
+    const refUsd = found.usd ? parseFloat(found.usd) : null;
     return {
       ...row, name: found.name, img: found.img || '', colors: found.colors || '',
-      cmc: found.cmc ?? null, price: found.usd ? parseFloat(found.usd) : null,
+      cmc: found.cmc ?? null, refUsd, price: refUsd,
+      condition: row.condition || 'Near Mint',
       inventoryId: matchInv?.id || null, status: 'done'
     };
   }
@@ -448,7 +472,7 @@ export default function Admin() {
     const parsed = parseDeckList(deckPasteText);
     if (parsed.length === 0) { alert('Pega al menos una carta.'); return; }
     setDeckImporting(true);
-    let rows = parsed.map(p => ({ ...p, img: '', status: 'pending' }));
+    let rows = parsed.map(p => ({ ...p, img: '', condition: 'Near Mint', status: 'pending' }));
     setDeckCards(rows);
     for (let i = 0; i < rows.length; i++) {
       setDeckCards(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'loading' } : r));
@@ -495,14 +519,15 @@ export default function Admin() {
     }
     setDeckForm(f => ({ ...f, name: f.name || d.name, coverImg: d.coverImg, coverName: d.coverName }));
     // Cada carta ya trae imagen de Moxfield, pero le pedimos precio/colores/cmc a Scryfall
-    let rows = d.cards.map(c => ({ name: c.name, qty: c.qty, img: c.img, status: 'pending' }));
+    let rows = d.cards.map(c => ({ name: c.name, qty: c.qty, img: c.img, condition: 'Near Mint', status: 'pending' }));
     setDeckCards(rows);
     for (let i = 0; i < rows.length; i++) {
       setDeckCards(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'loading' } : r));
       const found = await lookupCard(rows[i].name);
       const matchInv = items.find(it => it.name.toLowerCase() === rows[i].name.toLowerCase());
+      const refUsd = found?.usd ? parseFloat(found.usd) : null;
       const resolved = found
-        ? { ...rows[i], img: rows[i].img || found.img || '', colors: found.colors || '', cmc: found.cmc ?? null, price: found.usd ? parseFloat(found.usd) : null, inventoryId: matchInv?.id || null, status: 'done' }
+        ? { ...rows[i], img: rows[i].img || found.img || '', colors: found.colors || '', cmc: found.cmc ?? null, refUsd, price: refUsd, inventoryId: matchInv?.id || null, status: 'done' }
         : { ...rows[i], inventoryId: matchInv?.id || null, status: 'notfound' };
       rows[i] = resolved;
       setDeckCards(prev => prev.map((r, idx) => idx === i ? resolved : r));
@@ -513,11 +538,11 @@ export default function Admin() {
   }
 
   async function quickAddToInventory(row, idx) {
-    if (!row.price) { alert('No tengo un precio de referencia para agregarla sola, edítala manual en Inventario.'); return; }
+    if (!row.price || isNaN(parseFloat(row.price))) { alert('Ponle un precio a esta carta en el campo de precio antes de agregarla.'); return; }
     const r = await fetch('/api/inventory', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
       body: JSON.stringify({
-        name: row.name, img: row.img, price: row.price, qty: 1, condition: 'Near Mint',
+        name: row.name, img: row.img, price: parseFloat(row.price), qty: row.qty || 1, condition: row.condition || 'Near Mint',
         colors: row.colors, rarity: '', type_line: ''
       })
     });
@@ -1403,7 +1428,10 @@ export default function Admin() {
                   <input value={moxfieldUrl} onChange={e => setMoxfieldUrl(e.target.value)} placeholder="https://moxfield.com/decks/..." />
                   <button className="ghost" onClick={importFromMoxfield} disabled={deckImporting}>{deckImporting ? 'Importando...' : 'Importar'}</button>
                 </div>
-                <p className="hint" style={{ marginTop: 4 }}>Puede fallar si Moxfield cambia su sistema o el deck es privado — si pasa, usa la opción de pegar lista abajo.</p>
+                <p className="hint" style={{ marginTop: 4, color: 'var(--gold)' }}>
+                  ⚠️ Moxfield bloquea este tipo de conexión automática seguido (protección anti-bots de su parte, no es un error de esta tienda).
+                  Si falla, no reintentes muchas veces — mejor usa "pegar lista a mano" abajo, que es 100% confiable.
+                </p>
               </div>
 
               <div className="field">
@@ -1415,16 +1443,26 @@ export default function Admin() {
 
               {deckCards.length > 0 && (
                 <>
-                  <div style={{ marginTop: 16, maxHeight: 320, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8, padding: 10 }}>
+                  <div style={{ marginTop: 16, maxHeight: 380, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8, padding: 10 }}>
                     {deckCards.map((c, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', fontSize: '0.85rem', borderBottom: '1px solid var(--line)' }}>
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: '0.85rem', borderBottom: '1px solid var(--line)', flexWrap: 'wrap' }}>
                         {c.img && <img src={c.img} style={{ width: 24, height: 33, objectFit: 'cover', borderRadius: 3 }} />}
-                        <span style={{ flex: 1 }}>
-                          {c.qty}x {c.name}
+                        <span style={{ flex: '1 1 140px', minWidth: 120 }}>
+                          {c.name}
                           {c.status === 'loading' && <span className="hint"> · buscando...</span>}
                           {c.status === 'notfound' && <span style={{ color: 'var(--blood)' }}> · no encontrada</span>}
-                          {c.status === 'done' && c.price && <span className="hint"> · ${c.price.toFixed(2)} USD</span>}
                         </span>
+
+                        {c.status !== 'loading' && c.status !== 'notfound' && (
+                          <>
+                            <input type="number" value={c.qty} min="1" onChange={e => updateDeckCardRow(i, { qty: parseInt(e.target.value) || 1 })} style={{ width: 50 }} title="Cantidad" />
+                            <select value={c.condition || 'Near Mint'} onChange={e => changeRowCondition(i, e.target.value)} style={{ width: 130 }}>
+                              <option>Near Mint</option><option>Lightly Played</option><option>Moderately Played</option><option>Heavily Played</option><option>Damaged</option>
+                            </select>
+                            <input type="number" value={c.price ?? ''} onChange={e => updateDeckCardRow(i, { price: e.target.value })} placeholder="USD" style={{ width: 70 }} title="Precio unitario (USD)" />
+                          </>
+                        )}
+
                         {c.status === 'done' && (c.inventoryId
                           ? <span className="hint" style={{ color: 'var(--teal)' }}>en inventario</span>
                           : <button className="ghost" style={{ padding: '2px 8px', fontSize: '0.72rem' }} onClick={() => quickAddToInventory(c, i)}>+ Agregar a inventario</button>
@@ -1432,6 +1470,9 @@ export default function Admin() {
                       </div>
                     ))}
                   </div>
+                  <p className="hint" style={{ marginTop: 6 }}>
+                    El precio de referencia del deck (arriba) se suma solo con estos valores unitarios × cantidad. Si le cambias el precio o la condición a una carta, la suma se actualiza.
+                  </p>
                   {deckCards.some(c => c.status === 'notfound') && (
                     <button className="ghost" style={{ marginTop: 8 }} onClick={retryFailedDeckCards} disabled={deckImporting}>
                       Reintentar fallidas ({deckCards.filter(c => c.status === 'notfound').length})
