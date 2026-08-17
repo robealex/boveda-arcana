@@ -16,15 +16,21 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     if (!checkAdmin(req)) return res.status(401).json({ error: 'Password de administrador incorrecto' });
-    const { name, description, coverImg, coverName, price, moxfieldUrl, cards } = req.body;
+    const { name, description, coverImg, coverName, price, originalPrice, moxfieldUrl, cards } = req.body;
     if (!name || !price) return res.status(400).json({ error: 'Faltan datos: nombre y precio son obligatorios' });
     if (!Array.isArray(cards) || cards.length === 0) return res.status(400).json({ error: 'El deck necesita al menos una carta' });
 
     const deck = await prisma.deck.create({
       data: {
         name, description: description || null, coverImg: coverImg || null, coverName: coverName || null,
-        price, moxfieldUrl: moxfieldUrl || null,
-        cards: { create: cards.map(c => ({ name: c.name, qty: c.qty || 1, img: c.img || null, inventoryId: c.inventoryId || null })) }
+        price, originalPrice: originalPrice || null, moxfieldUrl: moxfieldUrl || null,
+        cards: {
+          create: cards.map(c => ({
+            name: c.name, qty: c.qty || 1, img: c.img || null, colors: c.colors || null,
+            cmc: c.cmc !== undefined && c.cmc !== null ? Math.round(c.cmc) : null,
+            price: c.price || null, inventoryId: c.inventoryId || null
+          }))
+        }
       },
       include: { cards: true }
     });

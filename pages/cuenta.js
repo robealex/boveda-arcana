@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Head from 'next/head';
 
 export default function Cuenta() {
   const [account, setAccount] = useState(null);
@@ -88,6 +89,10 @@ export default function Cuenta() {
   if (!account) {
     return (
       <div>
+        <Head>
+          <title>Inicia sesión o crea tu cuenta | Bóveda Arcana</title>
+          <meta name="description" content="Crea una cuenta gratis en Bóveda Arcana para guardar tus datos y ver tu historial de compras de cartas de Magic: The Gathering. No es obligatoria para comprar." />
+        </Head>
         <div className="hero">
           <div className="eyebrow">Bóveda Arcana</div>
           <h1>Mi cuenta</h1>
@@ -133,6 +138,10 @@ export default function Cuenta() {
 
   return (
     <div>
+      <Head>
+        <title>Mi cuenta | Bóveda Arcana</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Head>
       <div className="hero">
         <div className="eyebrow">Bóveda Arcana</div>
         <h1>Hola, {account.name}</h1>

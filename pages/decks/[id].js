@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 
 const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '';
 
@@ -22,11 +23,26 @@ export default function DeckDetail() {
     window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`, '_blank');
   }
 
+  function shareDeck() {
+    const url = window.location.href;
+    if (navigator.share) {
+      navigator.share({ title: `${deck.name} — Bóveda Arcana`, url }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(url);
+      alert('Link copiado al portapapeles.');
+    }
+  }
+
   if (notFound) return <main><p className="hint">No encontramos ese deck.</p></main>;
   if (!deck) return <main><p className="hint">Cargando...</p></main>;
 
   return (
     <div>
+      <Head>
+        <title>{deck.name} — Mazo de Magic: The Gathering en venta | Bóveda Arcana</title>
+        <meta name="description" content={`Compra el mazo ${deck.name}, ${deck.cards.reduce((s, c) => s + c.qty, 0)} cartas listas para jugar. Precio $${deck.price.toFixed(2)} USD.`} />
+      </Head>
+
       <div className="hero">
         <div className="eyebrow">Bóveda Arcana · Mazo completo</div>
         <h1>{deck.name}</h1>
@@ -37,7 +53,7 @@ export default function DeckDetail() {
 
       <main style={{ maxWidth: 700 }}>
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 30, alignItems: 'flex-start' }}>
-          {deck.coverImg && <img src={deck.coverImg} alt={deck.coverName} style={{ width: 220, borderRadius: 10, border: '1px solid var(--line)' }} />}
+          {deck.coverImg && <img src={deck.coverImg} alt={`Portada del mazo ${deck.name}, carta ${deck.coverName || ''}`} style={{ width: 220, borderRadius: 10, border: '1px solid var(--line)' }} />}
           <div>
             <p className="hint">{deck.cards.reduce((s, c) => s + c.qty, 0)} cartas en total</p>
             <div className="price mono" style={{ fontSize: '1.6rem' }}>{rate ? `$${(deck.price * rate).toFixed(2)} MXN` : '...'}</div>
@@ -45,10 +61,11 @@ export default function DeckDetail() {
             <button className="primary" onClick={buyOnWhatsapp} disabled={!deck.active} style={!deck.active ? { opacity: 0.5 } : {}}>
               {deck.active ? 'Comprar por WhatsApp' : 'Vendido'}
             </button>
+            <button className="ghost" style={{ marginLeft: 8 }} onClick={shareDeck}>Compartir este mazo</button>
           </div>
         </div>
 
-        <h3>Lista de cartas</h3>
+        <h2>Lista de cartas</h2>
         <table className="data-table">
           <thead><tr><th></th><th>Cant.</th><th>Nombre</th></tr></thead>
           <tbody>

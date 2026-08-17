@@ -22,7 +22,8 @@ export default async function handler(req, res) {
       type_line: c.type_line || c.card_faces?.[0]?.type_line || '',
       foil: Boolean(c.foil),
       lang: c.lang || 'en',
-      scryfall_uri: c.scryfall_uri || ''
+      scryfall_uri: c.scryfall_uri || '',
+      cmc: typeof c.cmc === 'number' ? c.cmc : null
     });
   } catch (e) {
     res.status(500).json({ error: 'Error al conectar con Scryfall' });

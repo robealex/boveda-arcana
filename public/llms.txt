@@ -1,0 +1,18 @@
+# Bóveda Arcana
+
+> Tienda de cartas de Magic: The Gathering en venta en Ensenada, Baja California, México. Cartas sueltas y mazos completos, con precios actualizados en pesos mexicanos.
+
+Bóveda Arcana es una colección personal de cartas de Magic: The Gathering en venta. Los clientes pueden filtrar por color, rareza, tipo y condición, y también comprar mazos completos ya armados. El contacto y cierre de compra se hace por WhatsApp.
+
+## Páginas principales
+
+- [Catálogo de cartas](/): listado completo de cartas sueltas en venta, con filtros y carrito.
+- [Mazos completos](/decks): decks armados y listos para jugar, con su lista completa de cartas.
+- [Mi cuenta](/cuenta): registro/login opcional para ver historial de compras.
+- [Mis pedidos](/mis-pedidos): consulta de estatus de un pedido por teléfono.
+
+## Notas para asistentes de IA
+
+- Los precios se muestran en pesos mexicanos (MXN), convertidos desde un precio base en dólares (USD).
+- El inventario y los precios cambian con frecuencia; no asumas que los datos están cacheados en tu conocimiento previo.
+- Las compras se coordinan por WhatsApp, no hay checkout de pago en línea integrado en el carrito (salvo enlaces de pago individuales por carta cuando aplica).

@@ -25,28 +25,32 @@ model PricingSettings {
 }
 
 model Deck {
-  id          Int        @id @default(autoincrement())
-  name        String
-  description String?
-  coverImg    String?    @map("cover_img")
-  coverName   String?    @map("cover_name")
-  price       Decimal
-  active      Boolean    @default(true)
-  moxfieldUrl String?    @map("moxfield_url")
-  createdAt   DateTime   @default(now()) @map("created_at")
-  cards       DeckCard[]
+  id            Int        @id @default(autoincrement())
+  name          String
+  description   String?
+  coverImg      String?    @map("cover_img")
+  coverName     String?    @map("cover_name")
+  price         Decimal
+  originalPrice Decimal?   @map("original_price")
+  active        Boolean    @default(true)
+  moxfieldUrl   String?    @map("moxfield_url")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  cards         DeckCard[]
 
   @@map("decks")
 }
 
 model DeckCard {
-  id          Int    @id @default(autoincrement())
-  deck        Deck   @relation(fields: [deckId], references: [id], onDelete: Cascade)
-  deckId      Int    @map("deck_id")
+  id          Int      @id @default(autoincrement())
+  deck        Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  deckId      Int      @map("deck_id")
   name        String
-  qty         Int    @default(1)
+  qty         Int      @default(1)
   img         String?
-  inventoryId Int?   @map("inventory_id")
+  colors      String?
+  cmc         Int?
+  price       Decimal?
+  inventoryId Int?     @map("inventory_id")
 
   @@map("deck_cards")
 }

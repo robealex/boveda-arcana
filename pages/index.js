@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import Head from 'next/head';
 
 const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '';
 const SHOP_OWNER = process.env.NEXT_PUBLIC_SHOP_OWNER || '';
 const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || '';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || '';
 const LANGUAGES = { en: 'Inglés', es: 'Español', ja: 'Japonés', de: 'Alemán', fr: 'Francés', it: 'Italiano', pt: 'Portugués', ru: 'Ruso', ko: 'Coreano', zhs: 'Chino simpl.', zht: 'Chino trad.' };
 
 export default function Home() {
@@ -212,6 +214,17 @@ export default function Home() {
     setCheckoutForm({ name: '', phone: '', email: '' });
   }
 
+  function shareItem(it) {
+    const url = `${SITE_URL || window.location.origin}/?carta=${it.id}`;
+    const text = `${it.name} — Bóveda Arcana`;
+    if (navigator.share) {
+      navigator.share({ title: text, url }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(url);
+      alert('Link copiado al portapapeles.');
+    }
+  }
+
   function CardBadges({ it }) {
     return (
       <>
@@ -221,13 +234,61 @@ export default function Home() {
     );
   }
 
+  const faqs = [
+    { q: '¿Cómo compro una carta en Bóveda Arcana?', a: 'Selecciona las cartas que quieras y agrégalas al carrito. Al final, llena tus datos de contacto y te llega un mensaje de WhatsApp con el resumen para coordinar el pago y la entrega.' },
+    { q: '¿Por cuánto tiempo se aparta mi pedido?', a: 'En cuanto envías tu pedido por WhatsApp, esas cartas quedan apartadas 48 horas mientras confirmamos la venta contigo.' },
+    { q: '¿Qué significa la condición de cada carta (Near Mint, Lightly Played, etc.)?', a: 'Es el estado físico de la carta. Near Mint es la mejor condición (casi sin uso) y el precio baja según se desgasta: Lightly Played, Moderately Played, Heavily Played y Damaged.' },
+    { q: '¿Los precios están en pesos o dólares?', a: 'Guardamos el precio base en dólares y la tienda lo convierte a pesos mexicanos con el tipo de cambio del día, así que siempre ves el precio actualizado en MXN.' },
+    { q: '¿Venden mazos completos, no solo cartas sueltas?', a: 'Sí, en la sección de Decks vendemos mazos ya armados y listos para jugar, con la lista completa de cartas visible antes de comprar.' }
+  ];
+
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map(f => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a }
+    }))
+  };
+
+  const localBusinessSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Store',
+    name: 'Bóveda Arcana',
+    description: 'Tienda de cartas de Magic: The Gathering en venta en Ensenada, Baja California.',
+    address: { '@type': 'PostalAddress', addressLocality: 'Ensenada', addressRegion: 'Baja California', addressCountry: 'MX' },
+    ...(WA_NUMBER ? { telephone: `+${WA_NUMBER}` } : {}),
+    ...(SITE_URL ? { url: SITE_URL } : {})
+  };
+
   return (
     <div>
+      <Head>
+        <title>Bóveda Arcana | Cartas de Magic: The Gathering en venta en Ensenada</title>
+        <meta name="description" content="Compra cartas sueltas y mazos completos de Magic: The Gathering en Ensenada, Baja California. Precios actualizados al tipo de cambio del día, filtra por color, rareza, tipo y condición." />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessSchema) }} />
+      </Head>
+
       <div className="hero">
-        <div className="eyebrow">Colección personal · Ensenada, MX</div>
-        <h1>Bóveda Arcana</h1>
-        <p className="sub">Cartas de Magic: The Gathering en venta{SHOP_OWNER ? ` · por ${SHOP_OWNER}` : ''}. Selecciona las que quieras y te contactamos para cerrar la venta.</p>
-        <div style={{ marginTop: 10, display: 'flex', gap: 16, justifyContent: 'center', fontSize: '0.85rem', flexWrap: 'wrap' }}>
+        <div className="eyebrow">Bóveda Arcana · Ensenada, MX</div>
+        <h1>Cartas de Magic: The Gathering en venta</h1>
+        <p className="sub">Colección personal de cartas sueltas y mazos completos{SHOP_OWNER ? `, de ${SHOP_OWNER}` : ''}. Elige lo que te interese y te contactamos por WhatsApp para cerrar la compra.</p>
+
+        <a href="#catalogo" className="primary" style={{ display: 'inline-block', marginTop: 14, textDecoration: 'none', padding: '10px 22px', borderRadius: 999 }}>
+          Ver catálogo completo ↓
+        </a>
+
+        <ul style={{ textAlign: 'left', maxWidth: 420, margin: '20px auto 0', color: 'var(--muted)', fontSize: '0.85rem', lineHeight: 1.7 }}>
+          <li>Precios en pesos, actualizados al tipo de cambio del día</li>
+          <li>Filtra por color, rareza, tipo y condición</li>
+          <li>Cartas foil identificadas con su propio ícono</li>
+          <li>Tu pedido se aparta 48 horas mientras confirmamos la venta</li>
+          <li>También vendemos mazos completos, listos para jugar</li>
+        </ul>
+
+        <div style={{ marginTop: 20, display: 'flex', gap: 16, justifyContent: 'center', fontSize: '0.85rem', flexWrap: 'wrap' }}>
           <a href="/decks" style={{ color: 'var(--gold)' }}>Ver mazos completos →</a>
           <a href="/mis-pedidos" style={{ color: 'var(--gold)' }}>Ver el estatus de mis pedidos →</a>
           {account ? (
@@ -250,7 +311,8 @@ export default function Home() {
         </div>
       )}
 
-      <main>
+      <main id="catalogo">
+        <h2 style={{ marginTop: 0 }}>Catálogo de cartas disponibles</h2>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
           <div className="field" style={{ maxWidth: 300, marginBottom: 0 }}>
             <input placeholder="Filtrar por nombre..." value={filter} onChange={e => setFilter(e.target.value)} />
@@ -310,7 +372,7 @@ export default function Home() {
             const disc = discountInfo(it);
             return (
               <div className="card" key={it.id} style={{ opacity: soldOut ? 0.55 : 1, cursor: 'pointer', position: 'relative' }} onClick={() => setDetailItem(it)}>
-                <div className="art">{it.img && <img src={it.img} alt={it.name} />}</div>
+                <div className="art">{it.img && <img src={it.img} alt={`Carta ${it.name} de Magic: The Gathering en venta`} />}</div>
                 {disc && !soldOut && (
                   <span style={{ position: 'absolute', top: 8, right: 8, background: 'var(--blood)', color: 'var(--parchment)', fontWeight: 800, fontSize: '0.8rem', padding: '4px 9px', borderRadius: 999, zIndex: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
                     -{disc.pctOff}%
@@ -352,8 +414,8 @@ export default function Home() {
                     <td>
                       {it.img && (
                         <div className="hover-thumb-wrap">
-                          <img className="hover-thumb-icon" src={it.img} alt={it.name} />
-                          <img className="hover-thumb-float" src={it.img} alt={it.name} />
+                          <img className="hover-thumb-icon" src={it.img} alt={`Miniatura de ${it.name}`} />
+                          <img className="hover-thumb-float" src={it.img} alt={`Vista ampliada de ${it.name}`} />
                         </div>
                       )}
                     </td>
@@ -409,7 +471,7 @@ export default function Home() {
             {cart.length === 0 && <p className="hint">Vacío por ahora.</p>}
             {cart.map(c => (
               <div className="cart-item" key={c.id}>
-                {c.img && <img src={c.img} alt={c.name} />}
+                {c.img && <img src={c.img} alt={`Carta ${c.name} en el carrito`} />}
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{c.name}</div>
                   <div className="mono" style={{ color: 'var(--gold)', fontSize: '0.78rem' }}>{rate ? `$${mxn(c.priceUsd).toFixed(2)} MXN` : '...'} <span style={{ color: 'var(--muted)' }}>(${c.priceUsd.toFixed(2)} USD)</span></div>
@@ -453,7 +515,7 @@ export default function Home() {
       {detailItem && (
         <div className="modal-bg show" onClick={() => setDetailItem(null)}>
           <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
-            {detailItem.img && <img src={detailItem.img} alt={detailItem.name} style={{ width: '100%', borderRadius: 8, marginBottom: 14 }} />}
+            {detailItem.img && <img src={detailItem.img} alt={`Imagen de la carta ${detailItem.name}, edición ${detailItem.setName}`} style={{ width: '100%', borderRadius: 8, marginBottom: 14 }} />}
             <h3 style={{ marginTop: 0, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
               {detailItem.foil && <span className="foil-badge" title="Foil" />}{detailItem.name}
               {discountInfo(detailItem) && detailItem.qty > 0 && (
@@ -500,10 +562,28 @@ export default function Home() {
                 <a href={detailItem.scryfallUri} target="_blank" rel="noreferrer" style={{ color: 'var(--gold)' }}>Ver ficha completa y gráfica de precio en Scryfall ↗</a>
               </p>
             )}
+            <button className="ghost" style={{ width: '100%', marginTop: 8 }} onClick={() => shareItem(detailItem)}>Compartir esta carta</button>
             <button className="ghost" style={{ width: '100%', marginTop: 8 }} onClick={() => setDetailItem(null)}>Cerrar</button>
           </div>
         </div>
       )}
+
+      <section style={{ maxWidth: 700, margin: '0 auto 40px', padding: '0 24px' }}>
+        <h2>Preguntas frecuentes</h2>
+        {faqs.map((f, i) => (
+          <div key={i} style={{ marginBottom: 18 }}>
+            <h3 style={{ fontSize: '1rem', marginBottom: 4 }}>{f.q}</h3>
+            <p className="hint" style={{ margin: 0 }}>{f.a}</p>
+          </div>
+        ))}
+
+        <h2 style={{ marginTop: 32 }}>Explora también</h2>
+        <ul style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.8 }}>
+          <li><a href="/decks" style={{ color: 'var(--gold)' }}>Mazos completos listos para jugar</a></li>
+          <li><a href="/cuenta" style={{ color: 'var(--gold)' }}>Crea una cuenta para guardar tu historial de compras</a></li>
+          <li><a href="/mis-pedidos" style={{ color: 'var(--gold)' }}>Consulta el estatus de un pedido ya hecho</a></li>
+        </ul>
+      </section>
 
       <footer>
         <div style={{ marginBottom: 10 }}>

@@ -65,6 +65,19 @@ button.ghost:hover{ border-color:var(--gold); }
   border: 1px solid rgba(255,255,255,0.4);
 }
 
+.mobile-sticky-cta{
+  display:none;
+}
+@media (max-width: 640px){
+  .mobile-sticky-cta{
+    display:flex; align-items:center; justify-content:center;
+    position:fixed; bottom:0; left:0; right:0; z-index:60;
+    background: var(--gold); color: var(--ink); text-decoration:none;
+    font-weight:700; padding:14px; font-size:0.9rem;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.4);
+  }
+}
+
 .hover-thumb-wrap{ position:relative; display:inline-block; }
 .hover-thumb-icon{ width:28px; height:38px; object-fit:cover; border-radius:4px; display:block; border:1px solid var(--line); }
 .hover-thumb-float{

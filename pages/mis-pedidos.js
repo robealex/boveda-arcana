@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Head from 'next/head';
 
 export default function MisPedidos() {
   const [phone, setPhone] = useState('');
@@ -27,6 +28,10 @@ export default function MisPedidos() {
 
   return (
     <div>
+      <Head>
+        <title>Consulta el estatus de tu pedido | Bóveda Arcana</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Head>
       <div className="hero">
         <div className="eyebrow">Bóveda Arcana</div>
         <h1>Mis pedidos</h1>
