@@ -42,7 +42,7 @@ button.ghost:hover{ border-color:var(--gold); }
 .card .price{ margin-top:auto; font-size:1.05rem; color:var(--gold); font-weight:600; }
 .badge{ background:var(--blood); color:var(--parchment); font-size:0.65rem; padding:3px 8px; border-radius:999px; display:inline-block; margin-bottom:6px; }
 
-.cart-fab{ position:fixed; bottom:24px; right:24px; background:var(--gold); color:var(--ink); border:none; width:58px; height:58px; border-radius:50%; font-weight:800; cursor:pointer; box-shadow:0 6px 20px rgba(0,0,0,.4); }
+.cart-fab{ position:fixed; top:24px; right:24px; z-index:40; background:var(--gold); color:var(--ink); border:none; width:58px; height:58px; border-radius:50%; font-weight:800; cursor:pointer; box-shadow:0 6px 20px rgba(0,0,0,.4); }
 .cart-panel{ position:fixed; top:0; right:0; width:380px; max-width:92vw; height:100%; background:var(--ink3); border-left:1px solid var(--line); z-index:30; padding:22px; overflow-y:auto; }
 .overlay{ position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:25; }
 .cart-item{ display:flex; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); align-items:center; }
