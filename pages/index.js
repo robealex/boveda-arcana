@@ -272,9 +272,9 @@ export default function Home() {
       </Head>
 
       <div className="hero">
-        <div className="eyebrow">Bóveda Arcana · Ensenada, MX</div>
-        <h1>Cartas de Magic: The Gathering en venta</h1>
-        <p className="sub">Colección personal de cartas sueltas y mazos completos{SHOP_OWNER ? `, de ${SHOP_OWNER}` : ''}. Elige lo que te interese y te contactamos por WhatsApp para cerrar la compra.</p>
+        <div className="eyebrow">Cartas de Magic: The Gathering · Ensenada, MX</div>
+        <h1>Bóveda Arcana</h1>
+        <p className="sub">Colección personal de cartas sueltas y mazos completos en venta. Elige lo que te interese y te contactamos por WhatsApp para cerrar la compra.</p>
 
         <a href="#catalogo" className="primary" style={{ display: 'inline-block', marginTop: 14, textDecoration: 'none', padding: '10px 22px', borderRadius: 999 }}>
           Ver catálogo completo ↓
