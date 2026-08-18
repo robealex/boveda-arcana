@@ -387,7 +387,7 @@ export default function Admin() {
       description: d.description || '', coverImg: d.coverImg || '', coverName: d.coverName || ''
     });
     setDeckCards(d.cards.map(c => ({
-      name: c.name, qty: c.qty, img: c.img || '', colors: c.colors || '', cmc: c.cmc,
+      name: c.name, qty: c.qty, img: c.img || '', colors: c.colors || '', cmc: c.cmc, typeLine: c.typeLine || '',
       price: c.price !== null && c.price !== undefined ? Number(c.price) : null,
       refUsd: c.price !== null && c.price !== undefined ? Number(c.price) : null,
       condition: 'Near Mint',
@@ -414,18 +414,22 @@ export default function Admin() {
     });
   }
 
-  async function lookupCard(name, timeoutMs = 8000) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const r = await fetch('/api/card-lookup?name=' + encodeURIComponent(name), { signal: controller.signal });
-      const d = await r.json();
-      clearTimeout(timer);
-      return r.ok ? d : null;
-    } catch (e) {
-      clearTimeout(timer);
-      return null;
+  async function lookupCard(name, timeoutMs = 8000, retries = 2) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const r = await fetch('/api/card-lookup?name=' + encodeURIComponent(name), { signal: controller.signal });
+        clearTimeout(timer);
+        if (r.ok) return await r.json();
+        // 404 real de Scryfall (no existe la carta) — no tiene caso reintentar
+        if (r.status === 404) return null;
+      } catch (e) {
+        clearTimeout(timer);
+      }
+      if (attempt < retries) await new Promise(res => setTimeout(res, 500 * (attempt + 1)));
     }
+    return null;
   }
 
   function recalcSuggestedPrice(rows) {
@@ -462,7 +466,7 @@ export default function Admin() {
     const refUsd = found.usd ? parseFloat(found.usd) : null;
     return {
       ...row, name: found.name, img: found.img || '', colors: found.colors || '',
-      cmc: found.cmc ?? null, refUsd, price: refUsd,
+      cmc: found.cmc ?? null, typeLine: found.type_line || '', refUsd, price: refUsd,
       condition: row.condition || 'Near Mint',
       inventoryId: matchInv?.id || null, status: 'done'
     };
@@ -479,7 +483,7 @@ export default function Admin() {
       const resolved = await resolveRow(rows[i]);
       rows[i] = resolved;
       setDeckCards(prev => prev.map((r, idx) => idx === i ? resolved : r));
-      await new Promise(res => setTimeout(res, 100));
+      await new Promise(res => setTimeout(res, 180));
     }
     setDeckImporting(false);
     recalcSuggestedPrice(rows);
@@ -495,10 +499,20 @@ export default function Admin() {
       const resolved = await resolveRow(deckCards[i]);
       updated[i] = resolved;
       setDeckCards(prev => prev.map((r, idx) => idx === i ? resolved : r));
-      await new Promise(res => setTimeout(res, 100));
+      await new Promise(res => setTimeout(res, 180));
     }
     setDeckImporting(false);
     recalcSuggestedPrice(updated);
+  }
+
+  async function retrySingleDeckCard(idx) {
+    setDeckCards(prev => prev.map((r, i) => i === idx ? { ...r, status: 'loading' } : r));
+    const resolved = await resolveRow(deckCards[idx]);
+    setDeckCards(prev => {
+      const next = prev.map((r, i) => i === idx ? resolved : r);
+      recalcSuggestedPrice(next);
+      return next;
+    });
   }
 
   async function resolveCardListWithImages(rawCards) {
@@ -506,15 +520,11 @@ export default function Admin() {
     setDeckCards(rows);
     for (let i = 0; i < rows.length; i++) {
       setDeckCards(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'loading' } : r));
-      const found = await lookupCard(rows[i].name);
-      const matchInv = items.find(it => it.name.toLowerCase() === rows[i].name.toLowerCase());
-      const refUsd = found?.usd ? parseFloat(found.usd) : null;
-      const resolved = found
-        ? { ...rows[i], img: rows[i].img || found.img || '', colors: found.colors || '', cmc: found.cmc ?? null, refUsd, price: refUsd, inventoryId: matchInv?.id || null, status: 'done' }
-        : { ...rows[i], inventoryId: matchInv?.id || null, status: 'notfound' };
+      const resolved = await resolveRow(rows[i]);
+      resolved.img = rows[i].img || resolved.img; // conserva la imagen del sitio de origen si ya venía
       rows[i] = resolved;
       setDeckCards(prev => prev.map((r, idx) => idx === i ? resolved : r));
-      await new Promise(res => setTimeout(res, 100));
+      await new Promise(res => setTimeout(res, 180));
     }
     return rows;
   }
@@ -523,13 +533,15 @@ export default function Admin() {
     const url = moxfieldUrl.trim();
     if (!url) return;
     const isArchidekt = url.includes('archidekt.com');
-    const isMoxfield = url.includes('moxfield.com');
-    if (!isArchidekt && !isMoxfield) { alert('Pega un link de Moxfield o de Archidekt.'); return; }
+    const isTappedout = url.includes('tappedout.net');
+    if (!isArchidekt && !isTappedout) { alert('Pega un link de Archidekt o de TappedOut.'); return; }
+    const siteName = isArchidekt ? 'Archidekt' : 'TappedOut';
+    const endpoint = isArchidekt ? '/api/archidekt-import' : '/api/tappedout-import';
 
     setDeckImporting(true);
     let d;
     try {
-      const r = await fetch(isArchidekt ? '/api/archidekt-import' : '/api/moxfield-import', {
+      const r = await fetch(endpoint, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
         body: JSON.stringify({ url })
       });
@@ -537,7 +549,7 @@ export default function Admin() {
       if (!r.ok) throw new Error(d.error || 'Error al importar');
     } catch (e) {
       setDeckImporting(false);
-      alert(e.message || `No se pudo conectar con ${isArchidekt ? 'Archidekt' : 'Moxfield'}, intenta de nuevo o pega la lista a mano.`);
+      alert(e.message || `No se pudo conectar con ${siteName}, intenta de nuevo o pega la lista a mano.`);
       return;
     }
     setDeckForm(f => ({ ...f, name: f.name || d.name, coverImg: f.coverImg || d.coverImg || '', coverName: f.coverName || d.coverName || '' }));
@@ -552,13 +564,23 @@ export default function Admin() {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
       body: JSON.stringify({
         name: row.name, img: row.img, price: parseFloat(row.price), qty: row.qty || 1, condition: row.condition || 'Near Mint',
-        colors: row.colors, rarity: '', type_line: ''
+        colors: row.colors, rarity: '', type_line: row.typeLine || ''
       })
     });
     const d = await r.json();
     if (!r.ok) { alert(d.error || 'Error al agregar'); return; }
     setDeckCards(prev => prev.map((c, i) => i === idx ? { ...c, inventoryId: d.item.id } : c));
     loadInventory();
+  }
+
+  async function addAllToInventory() {
+    const pending = deckCards.map((c, i) => ({ c, i })).filter(x => x.c.status === 'done' && !x.c.inventoryId && x.c.price);
+    if (pending.length === 0) { alert('No hay cartas pendientes de agregar (todas ya están en tu inventario, o les falta precio).'); return; }
+    if (!confirm(`¿Agregar ${pending.length} carta(s) a tu inventario?`)) return;
+    for (const { c, i } of pending) {
+      await quickAddToInventory(c, i);
+      await new Promise(res => setTimeout(res, 120));
+    }
   }
 
   async function saveDeck() {
@@ -569,7 +591,7 @@ export default function Admin() {
       name: deckForm.name, description: deckForm.description, price: parseFloat(deckForm.price),
       originalPrice: deckForm.originalPrice ? parseFloat(deckForm.originalPrice) : null,
       coverImg: deckForm.coverImg, coverName: deckForm.coverName, moxfieldUrl: moxfieldUrl || null,
-      cards: deckCards.map(c => ({ name: c.name, qty: c.qty, img: c.img, colors: c.colors, cmc: c.cmc, price: c.price, inventoryId: c.inventoryId }))
+      cards: deckCards.map(c => ({ name: c.name, qty: c.qty, img: c.img, colors: c.colors, cmc: c.cmc, typeLine: c.typeLine, price: c.price, inventoryId: c.inventoryId }))
     };
     const url = deckForm.id ? `/api/decks/${deckForm.id}` : '/api/decks';
     const method = deckForm.id ? 'PATCH' : 'POST';
@@ -1440,17 +1462,13 @@ export default function Admin() {
 
               <h4>Lista de cartas</h4>
               <div className="field">
-                <label>Importar desde Archidekt o Moxfield (opcional)</label>
+                <label>Importar desde Archidekt o TappedOut</label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input value={moxfieldUrl} onChange={e => setMoxfieldUrl(e.target.value)} placeholder="https://archidekt.com/decks/... o https://moxfield.com/decks/..." />
+                  <input value={moxfieldUrl} onChange={e => setMoxfieldUrl(e.target.value)} placeholder="https://archidekt.com/decks/... o https://tappedout.net/mtg-decks/..." />
                   <button className="ghost" onClick={importFromUrl} disabled={deckImporting}>{deckImporting ? 'Importando...' : 'Importar'}</button>
                 </div>
                 <p className="hint" style={{ marginTop: 4 }}>
-                  <b>Archidekt es más confiable</b> — su sistema sí permite este tipo de acceso automático.
-                </p>
-                <p className="hint" style={{ marginTop: 4, color: 'var(--gold)' }}>
-                  ⚠️ Moxfield bloquea este tipo de conexión automática seguido (protección anti-bots de su parte, no es un error de esta tienda).
-                  Si falla, no reintentes muchas veces — usa Archidekt o "pegar lista a mano" abajo, que es 100% confiable.
+                  Ambos permiten este tipo de acceso automático sin bloquearlo. Si aun así uno falla, prueba con el otro o pega la lista a mano.
                 </p>
               </div>
 
@@ -1463,15 +1481,27 @@ export default function Admin() {
 
               {deckCards.length > 0 && (
                 <>
-                  <div style={{ marginTop: 16, maxHeight: 380, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8, padding: 10 }}>
+                  <p className="hint" style={{ marginTop: 14 }}>
+                    Si algunas cartas no se encuentran, no te preocupes — puedes guardar el deck igual y reintentar buscarlas después
+                    (editando el deck), o corregir el nombre aquí mismo y reintentar solo esa.
+                  </p>
+                  <div style={{ marginTop: 8, maxHeight: 380, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8, padding: 10 }}>
                     {deckCards.map((c, i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: '0.85rem', borderBottom: '1px solid var(--line)', flexWrap: 'wrap' }}>
                         {c.img && <img src={c.img} style={{ width: 24, height: 33, objectFit: 'cover', borderRadius: 3 }} />}
-                        <span style={{ flex: '1 1 140px', minWidth: 120 }}>
-                          {c.name}
-                          {c.status === 'loading' && <span className="hint"> · buscando...</span>}
-                          {c.status === 'notfound' && <span style={{ color: 'var(--blood)' }}> · no encontrada</span>}
-                        </span>
+
+                        {c.status === 'notfound' ? (
+                          <>
+                            <input value={c.name} onChange={e => updateDeckCardRow(i, { name: e.target.value })} style={{ flex: '1 1 140px', minWidth: 120 }} />
+                            <span style={{ color: 'var(--blood)', fontSize: '0.75rem' }}>no encontrada</span>
+                            <button className="ghost" style={{ padding: '2px 8px', fontSize: '0.72rem' }} onClick={() => retrySingleDeckCard(i)}>Reintentar esta</button>
+                          </>
+                        ) : (
+                          <span style={{ flex: '1 1 140px', minWidth: 120 }}>
+                            {c.name}
+                            {c.status === 'loading' && <span className="hint"> · buscando...</span>}
+                          </span>
+                        )}
 
                         {c.status !== 'loading' && c.status !== 'notfound' && (
                           <>
@@ -1493,11 +1523,18 @@ export default function Admin() {
                   <p className="hint" style={{ marginTop: 6 }}>
                     El precio de referencia del deck (arriba) se suma solo con estos valores unitarios × cantidad. Si le cambias el precio o la condición a una carta, la suma se actualiza.
                   </p>
-                  {deckCards.some(c => c.status === 'notfound') && (
-                    <button className="ghost" style={{ marginTop: 8 }} onClick={retryFailedDeckCards} disabled={deckImporting}>
-                      Reintentar fallidas ({deckCards.filter(c => c.status === 'notfound').length})
-                    </button>
-                  )}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                    {deckCards.some(c => c.status === 'notfound') && (
+                      <button className="ghost" onClick={retryFailedDeckCards} disabled={deckImporting}>
+                        Reintentar todas las fallidas ({deckCards.filter(c => c.status === 'notfound').length})
+                      </button>
+                    )}
+                    {deckCards.some(c => c.status === 'done' && !c.inventoryId) && (
+                      <button className="ghost" onClick={addAllToInventory}>
+                        + Agregar todas a mi inventario ({deckCards.filter(c => c.status === 'done' && !c.inventoryId).length})
+                      </button>
+                    )}
+                  </div>
                 </>
               )}
 

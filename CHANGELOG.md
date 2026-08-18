@@ -42,15 +42,20 @@ Registro de todo lo construido hasta esta versión.
 
 ## Decks (mazos completos)
 - Sección separada de las cartas sueltas: catálogo público de decks (`/decks`) y detalle tipo Moxfield (`/decks/[id]`) con portada elegida, precio, y lista completa de cartas.
-- Creación en admin: pegar la lista a mano (confiable, vía Scryfall), importar desde **Archidekt** (confiable, su API sí permite acceso automático), o importar desde Moxfield (poco confiable — bloquea peticiones automáticas con Cloudflare, puede fallar seguido).
+- Creación en admin: pegar la lista a mano (confiable, vía Scryfall), importar desde **Archidekt** o **TappedOut** (ambos confiables), o desde Moxfield (retirado del formulario — bloquea peticiones automáticas con Cloudflare seguido).
+- Búsqueda de cartas con reintentos automáticos (hasta 2 intentos con espera progresiva) para que no se trabe a mitad de un deck grande.
+- Cartas que no se encuentran: nombre editable directo en la lista, con botón para reintentar solo esa (útil para corregir nombres mal escritos o encontrar otra versión).
+- Botón "Agregar todas a mi inventario" para cargar de un jalón todas las cartas del deck que no tenías, además del botón individual por carta.
 - Suma total de las cartas de la lista siempre visible en pantalla mientras armas el deck, junto a los campos de precio.
+- Editar decks ya guardados (reabrir, corregir/reintentar cartas, agregar más, sin tener que rehacer todo).
 - Precio de referencia calculado automático como la suma de las cartas del deck, con precio de venta editable y descuento visible en la página pública si vendes más barato que la suma.
 - Cada carta del deck es editable individualmente (cantidad, condición, precio unitario) y la suma se recalcula en vivo.
 - Botón "+ Agregar a inventario" por cada carta del deck que no esté en tu catálogo, sin salir del formulario.
 - Reintentar búsquedas fallidas sin rehacer todo el deck, incluso reabriendo un deck ya guardado para editarlo.
 - Al marcar un deck como vendido, se descuentan del inventario las cartas vinculadas; al reactivarlo, se regresan.
-- Estadísticas visuales en la página pública del deck: gráfica de pastel de distribución de colores, y gráfica de barras de curva de maná.
-- Toggle de vista lista/imágenes grandes en la lista de cartas del deck, con precio por carta visible.
+- Estadísticas visuales en la página pública del deck: gráfica de pastel de distribución de colores, gráfica de barras de curva de maná, y gráfica de barras por tipo de carta.
+- Orden de la lista de cartas del deck (nombre, color, tipo, precio), igual que en el catálogo de cartas sueltas.
+- Toggle de vista lista/imágenes grandes en la lista de cartas del deck, con precio y tipo por carta visible.
 
 ## Precio automático y ofertas
 - Precio sugerido según la condición de la carta (Near Mint, Lightly Played, etc.), con porcentajes configurables en `/admin` → Precios.

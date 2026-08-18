@@ -16,6 +16,14 @@ export default function DeckDetail() {
   const [rate, setRate] = useState(null);
   const [notFound, setNotFound] = useState(false);
   const [cardView, setCardView] = useState('list');
+  const [sortBy, setSortBy] = useState('name');
+
+  function mainType(typeLine) {
+    if (!typeLine) return 'Otro';
+    const front = typeLine.split('—')[0].trim();
+    const known = ['Creature', 'Instant', 'Sorcery', 'Artifact', 'Enchantment', 'Land', 'Planeswalker', 'Battle'];
+    return known.find(t => front.includes(t)) || front.split(' ')[0] || 'Otro';
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -81,6 +89,29 @@ export default function DeckDetail() {
     if (cmcBuckets[key] !== undefined) cmcBuckets[key] += c.qty;
   });
   const maxBucket = Math.max(1, ...Object.values(cmcBuckets));
+
+  // ---- Distribución por tipo ----
+  const typeCounts = {};
+  deck.cards.forEach(c => {
+    const t = mainType(c.typeLine);
+    typeCounts[t] = (typeCounts[t] || 0) + c.qty;
+  });
+  const typeEntries = Object.entries(typeCounts).sort((a, b) => b[1] - a[1]);
+  const maxType = Math.max(1, ...typeEntries.map(([, v]) => v));
+
+  // ---- Orden de la lista de cartas ----
+  const sortedCards = [...deck.cards].sort((a, b) => {
+    if (sortBy === 'name') return a.name.localeCompare(b.name);
+    if (sortBy === 'color') {
+      const ca = (a.colors || 'zzz').split(',')[0] || 'zzz';
+      const cb = (b.colors || 'zzz').split(',')[0] || 'zzz';
+      return ca.localeCompare(cb);
+    }
+    if (sortBy === 'type') return mainType(a.typeLine).localeCompare(mainType(b.typeLine));
+    if (sortBy === 'price_asc') return (Number(a.price) || 0) - (Number(b.price) || 0);
+    if (sortBy === 'price_desc') return (Number(b.price) || 0) - (Number(a.price) || 0);
+    return 0;
+  });
 
   return (
     <div>
@@ -150,21 +181,43 @@ export default function DeckDetail() {
             </div>
             <p className="hint" style={{ marginTop: 6 }}>Costo de maná convertido (CMC) de cada carta</p>
           </div>
+
+          <div>
+            <h3 style={{ fontSize: '0.95rem' }}>Por tipo de carta</h3>
+            <div>
+              {typeEntries.map(([t, count]) => (
+                <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span className="hint" style={{ width: 90, fontSize: '0.75rem' }}>{t}</span>
+                  <div style={{ background: 'var(--gold)', height: 12, borderRadius: 3, width: `${Math.max(6, (count / maxType) * 100)}px` }} />
+                  <span className="hint" style={{ fontSize: '0.72rem' }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 10 }}>
           <h2 style={{ margin: 0 }}>Lista de cartas</h2>
-          <div className="view-toggle">
-            <button className={cardView === 'list' ? 'active' : ''} onClick={() => setCardView('list')}>📋 Lista</button>
-            <button className={cardView === 'grid' ? 'active' : ''} onClick={() => setCardView('grid')}>🖼️ Imágenes grandes</button>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ width: 170 }}>
+              <option value="name">Nombre (A-Z)</option>
+              <option value="color">Color</option>
+              <option value="type">Tipo</option>
+              <option value="price_asc">Precio: menor a mayor</option>
+              <option value="price_desc">Precio: mayor a menor</option>
+            </select>
+            <div className="view-toggle">
+              <button className={cardView === 'list' ? 'active' : ''} onClick={() => setCardView('list')}>📋 Lista</button>
+              <button className={cardView === 'grid' ? 'active' : ''} onClick={() => setCardView('grid')}>🖼️ Imágenes grandes</button>
+            </div>
           </div>
         </div>
 
         {cardView === 'list' && (
           <table className="data-table">
-            <thead><tr><th></th><th>Cant.</th><th>Nombre</th><th>Colores</th><th>Precio ref.</th></tr></thead>
+            <thead><tr><th></th><th>Cant.</th><th>Nombre</th><th>Tipo</th><th>Colores</th><th>Precio ref.</th></tr></thead>
             <tbody>
-              {deck.cards.map(c => (
+              {sortedCards.map(c => (
                 <tr key={c.id}>
                   <td>
                     {c.img && (
@@ -176,6 +229,7 @@ export default function DeckDetail() {
                   </td>
                   <td>{c.qty}</td>
                   <td>{c.name}</td>
+                  <td className="hint">{c.typeLine || mainType(c.typeLine)}</td>
                   <td className="hint">{(c.colors || '').split(',').filter(Boolean).join(', ') || 'Incoloro'}</td>
                   <td className="hint">{c.price ? `$${Number(c.price).toFixed(2)} USD` : '—'}</td>
                 </tr>
@@ -186,12 +240,12 @@ export default function DeckDetail() {
 
         {cardView === 'grid' && (
           <div className="grid">
-            {deck.cards.map(c => (
+            {sortedCards.map(c => (
               <div className="card" key={c.id}>
                 <div className="art">{c.img && <img src={c.img} alt={`Carta ${c.name} del mazo ${deck.name}`} />}</div>
                 <div className="info">
                   <div className="name">{c.name}</div>
-                  <div className="set">Cantidad: {c.qty}</div>
+                  <div className="set">Cantidad: {c.qty}{c.typeLine ? ` · ${mainType(c.typeLine)}` : ''}</div>
                   {c.price && <div className="price mono">${Number(c.price).toFixed(2)} USD</div>}
                 </div>
               </div>

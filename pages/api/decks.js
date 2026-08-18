@@ -27,7 +27,8 @@ export default async function handler(req, res) {
         cards: {
           create: cards.map(c => ({
             name: c.name, qty: c.qty || 1, img: c.img || null, colors: c.colors || null,
-            cmc: c.cmc !== undefined && c.cmc !== null ? Math.round(c.cmc) : null,
+            cmc: c.cmc !== undefined && c.cmc !== null ? c.cmc : null,
+            typeLine: c.typeLine || null,
             price: c.price || null, inventoryId: c.inventoryId || null
           }))
         }

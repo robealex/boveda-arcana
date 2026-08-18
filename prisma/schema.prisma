@@ -48,7 +48,8 @@ model DeckCard {
   qty         Int      @default(1)
   img         String?
   colors      String?
-  cmc         Int?
+  cmc         Float?
+  typeLine    String?  @map("type_line")
   price       Decimal?
   inventoryId Int?     @map("inventory_id")
 
