@@ -90,3 +90,11 @@ Registro de todo lo construido hasta esta versión.
 - Botón de compartir (Web Share API) en cartas y decks.
 - CTA fijo de WhatsApp en la versión móvil.
 - Integración de Google Tag Manager (vía variable de entorno, sin código hardcodeado).
+
+## Rediseño visual (v2)
+- Nueva paleta de colores oscura con acentos dorados (#D4AF37), tipografía Cinzel para títulos e Inter para todo lo demás.
+- Header fijo (sticky) con logo, navegación (Cartas / Mazos / Cuenta), e ícono de carrito con contador — reemplaza el botón flotante anterior.
+- Barra de "Filtros Rápidos" rediseñada con círculos de color por cada color de maná (incluyendo Penta), y selects de Rareza/Tipo/Ordenar.
+- Cuadrícula de catálogo a 6 columnas en pantallas de escritorio.
+- Preguntas frecuentes en dos columnas en escritorio.
+- Footer con íconos de redes sociales opcionales (Facebook, Instagram, YouTube, LinkedIn — solo aparecen si configuras sus links).

@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
+import Header from '../components/Header';
 
 const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '';
 const SHOP_OWNER = process.env.NEXT_PUBLIC_SHOP_OWNER || '';
 const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || '';
+const FACEBOOK = process.env.NEXT_PUBLIC_FACEBOOK_URL || '';
+const INSTAGRAM = process.env.NEXT_PUBLIC_INSTAGRAM_URL || '';
+const YOUTUBE = process.env.NEXT_PUBLIC_YOUTUBE_URL || '';
+const LINKEDIN = process.env.NEXT_PUBLIC_LINKEDIN_URL || '';
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || '';
 const LANGUAGES = { en: 'Inglés', es: 'Español', ja: 'Japonés', de: 'Alemán', fr: 'Francés', it: 'Italiano', pt: 'Portugués', ru: 'Ruso', ko: 'Coreano', zhs: 'Chino simpl.', zht: 'Chino trad.' };
 
@@ -67,7 +72,11 @@ export default function Home() {
   const [viewMode, setViewMode] = useState('grid');
 
   const MAIN_TYPES = ['Creature', 'Instant', 'Sorcery', 'Artifact', 'Enchantment', 'Land', 'Planeswalker', 'Battle'];
-  const COLOR_INFO = { W: 'Blanco', U: 'Azul', B: 'Negro', R: 'Rojo', G: 'Verde', C: 'Incoloro' };
+  const COLOR_INFO = {
+    W: { label: 'Blanco', hex: '#e8dfc8' }, U: { label: 'Azul', hex: '#5ecbff' },
+    B: { label: 'Negro', hex: '#6b6b6b' }, R: { label: 'Rojo', hex: '#ff5e5e' },
+    G: { label: 'Verde', hex: '#6dff8a' }, C: { label: 'Incoloro', hex: '#c9c4b8' }
+  };
 
   function toggleColor(c) {
     setColorFilter(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
@@ -271,34 +280,21 @@ export default function Home() {
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessSchema) }} />
       </Head>
 
-      <div className="hero">
+      <Header active="CARTAS" cartCount={cart.reduce((s, c) => s + c.qty, 0)} onCartClick={() => setCartOpen(true)} />
+
+      <div className="hero" style={{ padding: '32px 24px 24px' }}>
         <div className="eyebrow">Cartas de Magic: The Gathering · Ensenada, MX</div>
         <h1>Bóveda Arcana</h1>
         <p className="sub">Colección personal de cartas sueltas y mazos completos en venta. Elige lo que te interese y te contactamos por WhatsApp para cerrar la compra.</p>
 
-        <a href="#catalogo" className="primary" style={{ display: 'inline-block', marginTop: 14, textDecoration: 'none', padding: '10px 22px', borderRadius: 999 }}>
-          Ver catálogo completo ↓
-        </a>
-
-        <ul style={{ textAlign: 'left', maxWidth: 420, margin: '20px auto 0', color: 'var(--muted)', fontSize: '0.85rem', lineHeight: 1.7 }}>
-          <li>Precios en pesos, actualizados al tipo de cambio del día</li>
-          <li>Filtra por color, rareza, tipo y condición</li>
-          <li>Cartas foil identificadas con su propio ícono</li>
-          <li>Tu pedido se aparta 48 horas mientras confirmamos la venta</li>
-          <li>También vendemos mazos completos, listos para jugar</li>
-        </ul>
-
-        <div style={{ marginTop: 20, display: 'flex', gap: 16, justifyContent: 'center', fontSize: '0.85rem', flexWrap: 'wrap' }}>
-          <a href="/decks" style={{ color: 'var(--gold)' }}>Ver mazos completos →</a>
+        <div style={{ marginTop: 14, display: 'flex', gap: 16, justifyContent: 'center', fontSize: '0.85rem', flexWrap: 'wrap' }}>
           <a href="/mis-pedidos" style={{ color: 'var(--gold)' }}>Ver el estatus de mis pedidos →</a>
           {account ? (
             <>
-              <a href="/cuenta" style={{ color: 'var(--gold)' }}>Mi cuenta ({account.name})</a>
+              <span style={{ color: 'var(--muted)' }}>Hola, {account.name}</span>
               <button className="ghost" style={{ padding: '2px 10px', fontSize: '0.8rem' }} onClick={logout}>Cerrar sesión</button>
             </>
-          ) : (
-            <a href="/cuenta" style={{ color: 'var(--gold)' }}>Iniciar sesión / crear cuenta</a>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -313,43 +309,66 @@ export default function Home() {
 
       <main id="catalogo">
         <h2 style={{ marginTop: 0 }}>Catálogo de cartas disponibles</h2>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+
+        <div style={{
+          background: 'var(--ink2)', border: '1px solid var(--line)', borderRadius: 12,
+          padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap', marginBottom: 20
+        }}>
+          <span style={{ fontFamily: "'Cinzel', serif", fontWeight: 600, fontSize: '1.05rem', whiteSpace: 'nowrap' }}>Filtros Rápidos</span>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {Object.entries(COLOR_INFO).map(([code, info]) => (
+              <button
+                key={code}
+                onClick={() => toggleColor(code)}
+                title={info.label}
+                style={{
+                  width: 28, height: 28, borderRadius: '50%', border: '1px solid var(--line)', cursor: 'pointer',
+                  background: info.hex, fontWeight: 700, fontSize: '0.7rem', color: '#12100d',
+                  opacity: colorFilter.includes(code) ? 1 : 0.4,
+                  transform: colorFilter.includes(code) ? 'scale(1.12)' : 'scale(1)',
+                  transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
+              >{code}</button>
+            ))}
+            <button
+              onClick={() => setColorFilter(colorFilter.length === 5 ? [] : ['W', 'U', 'B', 'R', 'G'])}
+              title="Penta (5 colores)"
+              style={{
+                width: 28, height: 28, borderRadius: '50%', border: '1px solid var(--line)', cursor: 'pointer',
+                background: 'conic-gradient(#e8dfc8,#5ecbff,#6b6b6b,#ff5e5e,#6dff8a)',
+                opacity: colorFilter.length === 5 ? 1 : 0.4,
+                transform: colorFilter.length === 5 ? 'scale(1.12)' : 'scale(1)',
+                transition: 'all 0.15s'
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginLeft: 'auto', flexWrap: 'wrap' }}>
+            <select value={rarityFilter} onChange={e => setRarityFilter(e.target.value)} style={{ width: 150 }}>
+              <option value="">Rareza</option>
+              <option value="common">Common</option>
+              <option value="uncommon">Uncommon</option>
+              <option value="rare">Rare</option>
+              <option value="mythic">Mythic</option>
+            </select>
+            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={{ width: 150 }}>
+              <option value="">Tipo</option>
+              {MAIN_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ width: 170 }}>
+              <option value="newest">Ordenar: más nuevas</option>
+              <option value="name">Ordenar: nombre (A-Z)</option>
+              <option value="price_asc">Ordenar: precio ↑</option>
+              <option value="price_desc">Ordenar: precio ↓</option>
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
           <div className="field" style={{ maxWidth: 300, marginBottom: 0 }}>
             <input placeholder="Filtrar por nombre..." value={filter} onChange={e => setFilter(e.target.value)} />
           </div>
-          <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ maxWidth: 220 }}>
-            <option value="newest">Más nuevas primero</option>
-            <option value="name">Nombre (A-Z)</option>
-            <option value="price_asc">Precio: menor a mayor</option>
-            <option value="price_desc">Precio: mayor a menor</option>
-          </select>
-          <select value={rarityFilter} onChange={e => setRarityFilter(e.target.value)} style={{ maxWidth: 180 }}>
-            <option value="">Cualquier rareza</option>
-            <option value="common">Common</option>
-            <option value="uncommon">Uncommon</option>
-            <option value="rare">Rare</option>
-            <option value="mythic">Mythic</option>
-          </select>
-          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={{ maxWidth: 180 }}>
-            <option value="">Cualquier tipo</option>
-            {MAIN_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-          {Object.entries(COLOR_INFO).map(([code, label]) => (
-            <button
-              key={code}
-              className="ghost"
-              onClick={() => toggleColor(code)}
-              style={{
-                borderColor: colorFilter.includes(code) ? 'var(--gold)' : 'var(--line)',
-                background: colorFilter.includes(code) ? 'rgba(201,162,39,0.12)' : 'transparent',
-                color: colorFilter.includes(code) ? 'var(--gold)' : 'var(--parchment)'
-              }}
-            >{label}</button>
-          ))}
-          <button className="ghost" onClick={() => setColorFilter(['W', 'U', 'B', 'R', 'G'])}>Penta (5 colores)</button>
           {colorFilter.length > 0 && <button className="ghost" onClick={() => setColorFilter([])}>Limpiar colores</button>}
         </div>
         <p className="hint" style={{ marginTop: -2, marginBottom: 24 }}>
@@ -366,7 +385,7 @@ export default function Home() {
         </div>
 
         {viewMode === 'grid' && (
-        <div className="grid">
+        <div className="catalog-grid">
           {pagedVisible.map(it => {
             const soldOut = it.qty <= 0;
             const disc = discountInfo(it);
@@ -388,7 +407,7 @@ export default function Home() {
                   <div className="price mono" style={disc ? { color: 'var(--blood)' } : {}}>{rate ? `$${mxn(payPrice(it)).toFixed(2)} MXN` : 'Cargando precio...'}</div>
                   <div className="hint" style={{ marginTop: -4 }}>${payPrice(it).toFixed(2)} USD</div>
                   <button className="primary" disabled={soldOut} style={soldOut ? { opacity: 0.5, cursor: 'not-allowed' } : {}} onClick={e => { e.stopPropagation(); addToCart(it); }}>
-                    {soldOut ? 'Agotado' : 'Agregar'}
+                    {soldOut ? 'Agotado' : '+ Agregar al carrito'}
                   </button>
                 </div>
               </div>
@@ -458,10 +477,6 @@ export default function Home() {
           </div>
         )}
       </main>
-
-      <button className="cart-fab" onClick={() => setCartOpen(true)}>
-        🛒 {cart.reduce((s, c) => s + c.qty, 0)}
-      </button>
 
       {cartOpen && (
         <>
@@ -568,14 +583,16 @@ export default function Home() {
         </div>
       )}
 
-      <section style={{ maxWidth: 700, margin: '0 auto 40px', padding: '0 24px' }}>
+      <section style={{ maxWidth: 900, margin: '0 auto 40px', padding: '0 24px' }}>
         <h2>Preguntas frecuentes</h2>
-        {faqs.map((f, i) => (
-          <div key={i} style={{ marginBottom: 18 }}>
-            <h3 style={{ fontSize: '1rem', marginBottom: 4 }}>{f.q}</h3>
-            <p className="hint" style={{ margin: 0 }}>{f.a}</p>
-          </div>
-        ))}
+        <div className="faq-grid">
+          {faqs.map((f, i) => (
+            <div key={i} style={{ marginBottom: 18 }}>
+              <h3 style={{ fontSize: '1rem', marginBottom: 4 }}>{f.q}</h3>
+              <p className="hint" style={{ margin: 0 }}>{f.a}</p>
+            </div>
+          ))}
+        </div>
 
         <h2 style={{ marginTop: 32 }}>Explora también</h2>
         <ul style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: 1.8 }}>
@@ -585,7 +602,15 @@ export default function Home() {
         </ul>
       </section>
 
-      <footer>
+      <footer style={{ paddingTop: 32 }}>
+        {(FACEBOOK || INSTAGRAM || YOUTUBE || LINKEDIN) && (
+          <div style={{ display: 'flex', gap: 18, justifyContent: 'center', marginBottom: 16, fontSize: '1.3rem' }}>
+            {FACEBOOK && <a href={FACEBOOK} target="_blank" rel="noreferrer" style={{ color: 'var(--muted)' }} onMouseOver={e => e.target.style.color = 'var(--gold)'} onMouseOut={e => e.target.style.color = 'var(--muted)'}>Facebook</a>}
+            {INSTAGRAM && <a href={INSTAGRAM} target="_blank" rel="noreferrer" style={{ color: 'var(--muted)' }} onMouseOver={e => e.target.style.color = 'var(--gold)'} onMouseOut={e => e.target.style.color = 'var(--muted)'}>Instagram</a>}
+            {YOUTUBE && <a href={YOUTUBE} target="_blank" rel="noreferrer" style={{ color: 'var(--muted)' }} onMouseOver={e => e.target.style.color = 'var(--gold)'} onMouseOut={e => e.target.style.color = 'var(--muted)'}>YouTube</a>}
+            {LINKEDIN && <a href={LINKEDIN} target="_blank" rel="noreferrer" style={{ color: 'var(--muted)' }} onMouseOver={e => e.target.style.color = 'var(--gold)'} onMouseOut={e => e.target.style.color = 'var(--muted)'}>LinkedIn</a>}
+          </div>
+        )}
         <div style={{ marginBottom: 10 }}>
           <strong style={{ color: 'var(--parchment)' }}>Contacto</strong><br />
           {SHOP_OWNER && <span>{SHOP_OWNER}</span>}

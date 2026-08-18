@@ -58,6 +58,10 @@ En tu proyecto de Vercel: **Settings → Environment Variables**, agrega estas
 | `CUSTOMER_JWT_SECRET` | cualquier texto largo y aleatorio, para las sesiones de cuenta de cliente | `una-frase-larga-y-random-123` |
 | `NEXT_PUBLIC_SITE_URL` | opcional — tu URL pública, para que los links de recuperar contraseña apunten bien | `https://boveda-arcana.vercel.app` |
 | `NEXT_PUBLIC_GTM_ID` | opcional — tu ID de Google Tag Manager | `GTM-XXXXXXX` |
+| `NEXT_PUBLIC_FACEBOOK_URL` | opcional — link a tu Facebook (aparece en el footer) | `https://facebook.com/tutienda` |
+| `NEXT_PUBLIC_INSTAGRAM_URL` | opcional — link a tu Instagram | `https://instagram.com/tutienda` |
+| `NEXT_PUBLIC_YOUTUBE_URL` | opcional | `https://youtube.com/@tutienda` |
+| `NEXT_PUBLIC_LINKEDIN_URL` | opcional | `https://linkedin.com/company/tutienda` |
 
 ### Correos de pedidos (Resend)
 

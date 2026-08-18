@@ -7,7 +7,10 @@ export default function Document() {
     <Html lang="es">
       <Head>
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <meta name="theme-color" content="#12100d" />
+        <meta name="theme-color" content="#121315" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
+        <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         {GTM_ID && (
           <script
             dangerouslySetInnerHTML={{
