@@ -501,25 +501,8 @@ export default function Admin() {
     recalcSuggestedPrice(updated);
   }
 
-  async function importFromMoxfield() {
-    if (!moxfieldUrl.trim()) return;
-    setDeckImporting(true);
-    let d;
-    try {
-      const r = await fetch('/api/moxfield-import', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
-        body: JSON.stringify({ url: moxfieldUrl })
-      });
-      d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Error al importar');
-    } catch (e) {
-      setDeckImporting(false);
-      alert(e.message || 'No se pudo conectar con Moxfield, intenta de nuevo o pega la lista a mano.');
-      return;
-    }
-    setDeckForm(f => ({ ...f, name: f.name || d.name, coverImg: d.coverImg, coverName: d.coverName }));
-    // Cada carta ya trae imagen de Moxfield, pero le pedimos precio/colores/cmc a Scryfall
-    let rows = d.cards.map(c => ({ name: c.name, qty: c.qty, img: c.img, condition: 'Near Mint', status: 'pending' }));
+  async function resolveCardListWithImages(rawCards) {
+    let rows = rawCards.map(c => ({ name: c.name, qty: c.qty, img: c.img || '', condition: 'Near Mint', status: 'pending' }));
     setDeckCards(rows);
     for (let i = 0; i < rows.length; i++) {
       setDeckCards(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'loading' } : r));
@@ -533,6 +516,32 @@ export default function Admin() {
       setDeckCards(prev => prev.map((r, idx) => idx === i ? resolved : r));
       await new Promise(res => setTimeout(res, 100));
     }
+    return rows;
+  }
+
+  async function importFromUrl() {
+    const url = moxfieldUrl.trim();
+    if (!url) return;
+    const isArchidekt = url.includes('archidekt.com');
+    const isMoxfield = url.includes('moxfield.com');
+    if (!isArchidekt && !isMoxfield) { alert('Pega un link de Moxfield o de Archidekt.'); return; }
+
+    setDeckImporting(true);
+    let d;
+    try {
+      const r = await fetch(isArchidekt ? '/api/archidekt-import' : '/api/moxfield-import', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
+        body: JSON.stringify({ url })
+      });
+      d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Error al importar');
+    } catch (e) {
+      setDeckImporting(false);
+      alert(e.message || `No se pudo conectar con ${isArchidekt ? 'Archidekt' : 'Moxfield'}, intenta de nuevo o pega la lista a mano.`);
+      return;
+    }
+    setDeckForm(f => ({ ...f, name: f.name || d.name, coverImg: f.coverImg || d.coverImg || '', coverName: f.coverName || d.coverName || '' }));
+    const rows = await resolveCardListWithImages(d.cards);
     setDeckImporting(false);
     recalcSuggestedPrice(rows);
   }
@@ -1403,6 +1412,14 @@ export default function Admin() {
                 </p>
               )}
 
+              <div style={{ background: 'var(--ink2)', border: '1px solid var(--line)', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
+                <span className="hint">Suma actual de las cartas de abajo: </span>
+                <span className="mono" style={{ color: 'var(--gold)', fontWeight: 700 }}>
+                  ${deckCards.reduce((s, c) => s + (c.price ? Number(c.price) * (c.qty || 1) : 0), 0).toFixed(2)} USD
+                </span>
+                <span className="hint"> ({deckCards.reduce((s, c) => s + (c.qty || 1), 0)} cartas)</span>
+              </div>
+
               <div className="field"><label>Descripción (opcional)</label><input value={deckForm.description} onChange={e => setDeckForm(f => ({ ...f, description: e.target.value }))} /></div>
 
               <div className="field">
@@ -1423,14 +1440,17 @@ export default function Admin() {
 
               <h4>Lista de cartas</h4>
               <div className="field">
-                <label>Importar desde Moxfield (opcional)</label>
+                <label>Importar desde Archidekt o Moxfield (opcional)</label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input value={moxfieldUrl} onChange={e => setMoxfieldUrl(e.target.value)} placeholder="https://moxfield.com/decks/..." />
-                  <button className="ghost" onClick={importFromMoxfield} disabled={deckImporting}>{deckImporting ? 'Importando...' : 'Importar'}</button>
+                  <input value={moxfieldUrl} onChange={e => setMoxfieldUrl(e.target.value)} placeholder="https://archidekt.com/decks/... o https://moxfield.com/decks/..." />
+                  <button className="ghost" onClick={importFromUrl} disabled={deckImporting}>{deckImporting ? 'Importando...' : 'Importar'}</button>
                 </div>
+                <p className="hint" style={{ marginTop: 4 }}>
+                  <b>Archidekt es más confiable</b> — su sistema sí permite este tipo de acceso automático.
+                </p>
                 <p className="hint" style={{ marginTop: 4, color: 'var(--gold)' }}>
                   ⚠️ Moxfield bloquea este tipo de conexión automática seguido (protección anti-bots de su parte, no es un error de esta tienda).
-                  Si falla, no reintentes muchas veces — mejor usa "pegar lista a mano" abajo, que es 100% confiable.
+                  Si falla, no reintentes muchas veces — usa Archidekt o "pegar lista a mano" abajo, que es 100% confiable.
                 </p>
               </div>
 

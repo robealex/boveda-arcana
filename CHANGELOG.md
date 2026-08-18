@@ -42,7 +42,8 @@ Registro de todo lo construido hasta esta versión.
 
 ## Decks (mazos completos)
 - Sección separada de las cartas sueltas: catálogo público de decks (`/decks`) y detalle tipo Moxfield (`/decks/[id]`) con portada elegida, precio, y lista completa de cartas.
-- Creación en admin: pegar la lista a mano (confiable, vía Scryfall) o importar desde una URL de Moxfield (poco confiable — Moxfield bloquea peticiones automáticas con Cloudflare, así que puede fallar seguido; el aviso en pantalla lo explica).
+- Creación en admin: pegar la lista a mano (confiable, vía Scryfall), importar desde **Archidekt** (confiable, su API sí permite acceso automático), o importar desde Moxfield (poco confiable — bloquea peticiones automáticas con Cloudflare, puede fallar seguido).
+- Suma total de las cartas de la lista siempre visible en pantalla mientras armas el deck, junto a los campos de precio.
 - Precio de referencia calculado automático como la suma de las cartas del deck, con precio de venta editable y descuento visible en la página pública si vendes más barato que la suma.
 - Cada carta del deck es editable individualmente (cantidad, condición, precio unitario) y la suma se recalcula en vivo.
 - Botón "+ Agregar a inventario" por cada carta del deck que no esté en tu catálogo, sin salir del formulario.
