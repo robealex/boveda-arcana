@@ -1396,6 +1396,14 @@ export default function Admin() {
               <h4>Datos del deck</h4>
               <div className="field"><label>Nombre del deck</label><input value={deckForm.name} onChange={e => setDeckForm(f => ({ ...f, name: e.target.value }))} /></div>
 
+              <div style={{ background: 'var(--ink2)', border: '1px solid var(--line)', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
+                <span className="hint">Suma actual de las cartas de abajo: </span>
+                <span className="mono" style={{ color: 'var(--gold)', fontWeight: 700 }}>
+                  ${deckCards.reduce((s, c) => s + (c.price ? Number(c.price) * (c.qty || 1) : 0), 0).toFixed(2)} USD
+                </span>
+                <span className="hint"> ({deckCards.reduce((s, c) => s + (c.qty || 1), 0)} cartas)</span>
+              </div>
+
               <div style={{ display: 'flex', gap: 10 }}>
                 <div className="field" style={{ flex: 1 }}>
                   <label>Precio de referencia (suma de cartas)</label>
@@ -1411,14 +1419,6 @@ export default function Admin() {
                   Descuento de {Math.round((1 - deckForm.price / deckForm.originalPrice) * 100)}% vs. comprar las cartas por separado — así se verá en la página del deck.
                 </p>
               )}
-
-              <div style={{ background: 'var(--ink2)', border: '1px solid var(--line)', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
-                <span className="hint">Suma actual de las cartas de abajo: </span>
-                <span className="mono" style={{ color: 'var(--gold)', fontWeight: 700 }}>
-                  ${deckCards.reduce((s, c) => s + (c.price ? Number(c.price) * (c.qty || 1) : 0), 0).toFixed(2)} USD
-                </span>
-                <span className="hint"> ({deckCards.reduce((s, c) => s + (c.qty || 1), 0)} cartas)</span>
-              </div>
 
               <div className="field"><label>Descripción (opcional)</label><input value={deckForm.description} onChange={e => setDeckForm(f => ({ ...f, description: e.target.value }))} /></div>
 
