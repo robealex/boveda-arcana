@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import ThemeToggle from '../../components/ThemeToggle';
 
 const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '';
 const COLOR_INFO = {
@@ -121,6 +122,7 @@ export default function DeckDetail() {
       </Head>
 
       <div className="hero">
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}><ThemeToggle /></div>
         <div className="eyebrow">Bóveda Arcana · Mazo completo</div>
         <h1>{deck.name}</h1>
         {deck.description && <p className="sub">{deck.description}</p>}

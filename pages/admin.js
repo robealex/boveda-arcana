@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function Admin() {
   const [pw, setPw] = useState('');
@@ -840,6 +841,7 @@ export default function Admin() {
   if (!authed) {
     return (
       <main style={{ maxWidth: 360, marginTop: 100 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}><ThemeToggle /></div>
         <h2>Acceso de administrador</h2>
         <div className="field">
           <label>Contraseña</label>
@@ -851,6 +853,21 @@ export default function Admin() {
   }
 
   return (
+    <div>
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 50, background: 'var(--ink)', opacity: 0.97, backdropFilter: 'blur(8px)',
+        borderBottom: '1px solid var(--line)'
+      }}>
+        <div style={{ maxWidth: 1180, margin: '0 auto', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+          <a href="/" style={{ textDecoration: 'none' }}>
+            <span style={{ fontFamily: "'Cinzel', serif", fontWeight: 700, fontSize: '1.5rem', color: 'var(--gold)', letterSpacing: '0.03em' }}>
+              BÓVEDA ARCANA <span style={{ color: 'var(--muted)', fontSize: '0.9rem', fontWeight: 600 }}>· ADMIN</span>
+            </span>
+          </a>
+          <ThemeToggle />
+        </div>
+      </div>
+
     <main>
       <h2>Panel de administrador</h2>
 
@@ -1706,5 +1723,6 @@ export default function Admin() {
         </div>
       )}
     </main>
+    </div>
   );
 }

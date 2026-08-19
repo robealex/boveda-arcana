@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import ThemeToggle from './ThemeToggle';
 
 export default function Header({ active, cartCount, onCartClick }) {
   const navItems = [
@@ -6,20 +6,6 @@ export default function Header({ active, cartCount, onCartClick }) {
     { label: 'MAZOS', href: '/decks' },
     { label: 'CUENTA', href: '/cuenta' }
   ];
-
-  const [theme, setTheme] = useState('dark');
-
-  useEffect(() => {
-    const current = document.documentElement.getAttribute('data-theme') || 'dark';
-    setTheme(current);
-  }, []);
-
-  function toggleTheme() {
-    const next = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-    document.documentElement.setAttribute('data-theme', next);
-    try { localStorage.setItem('theme', next); } catch (e) {}
-  }
 
   return (
     <div style={{
@@ -55,17 +41,7 @@ export default function Header({ active, cartCount, onCartClick }) {
         </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <button
-            onClick={toggleTheme}
-            style={{
-              background: 'transparent', border: '1px solid var(--line)', borderRadius: 999,
-              cursor: 'pointer', fontSize: '1rem', padding: '4px 10px', color: 'var(--parchment)'
-            }}
-            aria-label="Cambiar tema claro/oscuro"
-            title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-          >
-            {theme === 'dark' ? '☀️' : '🌙'}
-          </button>
+          <ThemeToggle />
 
           <button
             onClick={onCartClick}

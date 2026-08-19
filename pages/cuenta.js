@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function Cuenta() {
   const [account, setAccount] = useState(null);
@@ -94,6 +95,7 @@ export default function Cuenta() {
           <meta name="description" content="Crea una cuenta gratis en Bóveda Arcana para guardar tus datos y ver tu historial de compras de cartas de Magic: The Gathering. No es obligatoria para comprar." />
         </Head>
         <div className="hero">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}><ThemeToggle /></div>
           <div className="eyebrow">Bóveda Arcana</div>
           <h1>Mi cuenta</h1>
           <p className="sub">Crea una cuenta para guardar tus datos y ver tu historial de compras automáticamente. No es necesario para comprar — también puedes seguir comprando como invitado.</p>
@@ -143,6 +145,7 @@ export default function Cuenta() {
         <meta name="robots" content="noindex, nofollow" />
       </Head>
       <div className="hero">
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}><ThemeToggle /></div>
         <div className="eyebrow">Bóveda Arcana</div>
         <h1>Hola, {account.name}</h1>
         <p style={{ marginTop: -6 }}><a href="/" style={{ color: 'var(--gold)', fontSize: '0.85rem' }}>← Volver a la tienda</a></p>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import ThemeToggle from '../../components/ThemeToggle';
 
 const SHOP_OWNER = process.env.NEXT_PUBLIC_SHOP_OWNER || 'Bóveda Arcana';
 const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '';
@@ -52,8 +53,9 @@ export default function Recibo() {
         }
       `}</style>
       <main style={{ maxWidth: 480 }}>
-        <div className="no-print" style={{ marginBottom: 16 }}>
+        <div className="no-print" style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <button className="primary" onClick={() => window.print()}>Imprimir / Guardar como PDF</button>
+          <ThemeToggle />
         </div>
         <div className="receipt-box" style={{ border: '1px solid var(--line)', borderRadius: 10, padding: 24 }}>
           <h2 style={{ marginTop: 0 }}>{SHOP_OWNER}</h2>

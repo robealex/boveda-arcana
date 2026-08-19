@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function ResetPassword() {
   const [password, setPassword] = useState('');
@@ -25,6 +26,7 @@ export default function ResetPassword() {
   return (
     <div>
       <div className="hero">
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}><ThemeToggle /></div>
         <div className="eyebrow">Bóveda Arcana</div>
         <h1>Nueva contraseña</h1>
         <p style={{ marginTop: 10 }}><a href="/cuenta" style={{ color: 'var(--gold)', fontSize: '0.85rem' }}>← Volver a mi cuenta</a></p>
