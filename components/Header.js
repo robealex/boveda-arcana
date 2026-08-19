@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 export default function Header({ active, cartCount, onCartClick }) {
   const navItems = [
     { label: 'CARTAS', href: '/' },
@@ -5,10 +7,24 @@ export default function Header({ active, cartCount, onCartClick }) {
     { label: 'CUENTA', href: '/cuenta' }
   ];
 
+  const [theme, setTheme] = useState('dark');
+
+  useEffect(() => {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    setTheme(current);
+  }, []);
+
+  function toggleTheme() {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('theme', next); } catch (e) {}
+  }
+
   return (
     <div style={{
       position: 'sticky', top: 0, zIndex: 50,
-      background: 'rgba(18,19,21,0.88)', backdropFilter: 'blur(8px)',
+      background: 'var(--ink)', opacity: 0.97, backdropFilter: 'blur(8px)',
       borderBottom: '1px solid var(--line)'
     }}>
       <div style={{
@@ -38,25 +54,39 @@ export default function Header({ active, cartCount, onCartClick }) {
           ))}
         </nav>
 
-        <button
-          onClick={onCartClick}
-          style={{
-            position: 'relative', background: 'transparent', border: 'none', cursor: 'pointer',
-            fontSize: '1.4rem', color: 'var(--parchment)', padding: 4
-          }}
-          aria-label="Carrito"
-        >
-          🛒
-          {cartCount > 0 && (
-            <span style={{
-              position: 'absolute', top: -4, right: -6, background: 'var(--gold)', color: 'var(--ink)',
-              borderRadius: '50%', width: 18, height: 18, fontSize: '0.65rem', fontWeight: 700,
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              {cartCount}
-            </span>
-          )}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <button
+            onClick={toggleTheme}
+            style={{
+              background: 'transparent', border: '1px solid var(--line)', borderRadius: 999,
+              cursor: 'pointer', fontSize: '1rem', padding: '4px 10px', color: 'var(--parchment)'
+            }}
+            aria-label="Cambiar tema claro/oscuro"
+            title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
+
+          <button
+            onClick={onCartClick}
+            style={{
+              position: 'relative', background: 'transparent', border: 'none', cursor: 'pointer',
+              fontSize: '1.4rem', color: 'var(--parchment)', padding: 4
+            }}
+            aria-label="Carrito"
+          >
+            🛒
+            {cartCount > 0 && (
+              <span style={{
+                position: 'absolute', top: -4, right: -6, background: 'var(--gold)', color: 'var(--ink)',
+                borderRadius: '50%', width: 18, height: 18, fontSize: '0.65rem', fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                {cartCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -3,8 +3,13 @@
   --parchment:#F3F4F6; --muted:#9CA3AF; --gold:#D4AF37; --gold-soft:#C5A028;
   --teal:#2f8f6f; --blood:#c0392b; --line:#2A2D32; --radius:10px;
 }
+:root[data-theme='light']{
+  --ink:#F7F5F0; --ink2:#FFFFFF; --ink3:#FBFAF7;
+  --parchment:#1C1B18; --muted:#6B6558; --gold:#B8862B; --gold-soft:#A3771F;
+  --teal:#1f7a5c; --blood:#b23a2c; --line:#E4DFD3;
+}
 *{box-sizing:border-box;}
-html,body{ padding:0; margin:0; background:var(--ink); color:var(--parchment); font-family:'Inter',Arial,sans-serif; }
+html,body{ padding:0; margin:0; background:var(--ink); color:var(--parchment); font-family:'Inter',Arial,sans-serif; transition:background .2s, color .2s; }
 h1,h2,h3{ font-family:'Cinzel', Georgia, serif; font-weight:700; letter-spacing:0.02em; }
 .mono{ font-family:'Courier New', monospace; }
 a{ color:inherit; }
