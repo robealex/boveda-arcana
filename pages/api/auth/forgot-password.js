@@ -10,6 +10,10 @@ export default async function handler(req, res) {
   const customer = await prisma.customer.findUnique({ where: { email: email.toLowerCase().trim() } });
   // Por seguridad, respondemos igual exista o no la cuenta (no revelamos si el correo está registrado)
   if (customer) {
+    if (customer.resetTokenExpiry && customer.resetTokenExpiry > new Date(Date.now() + 59 * 60 * 1000)) {
+      // Ya se generó un token hace menos de un minuto (expira en ~60 min), evita spam de correos
+      return res.status(200).json({ ok: true, message: 'Ya te mandamos un link hace un momento, revisa tu correo (incluyendo spam).' });
+    }
     const token = crypto.randomBytes(24).toString('hex');
     const expiry = new Date(Date.now() + 60 * 60 * 1000);
     await prisma.customer.update({ where: { id: customer.id }, data: { resetToken: token, resetTokenExpiry: expiry } });

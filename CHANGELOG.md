@@ -98,3 +98,10 @@ Registro de todo lo construido hasta esta versión.
 - Cuadrícula de catálogo a 6 columnas en pantallas de escritorio.
 - Preguntas frecuentes en dos columnas en escritorio.
 - Footer con íconos de redes sociales opcionales (Facebook, Instagram, YouTube, LinkedIn — solo aparecen si configuras sus links).
+
+## Legal y seguridad de cuentas
+- Página de Aviso de Privacidad (`/aviso-privacidad`), enlazada al final del menú de navegación.
+- Bloqueo temporal de cuenta tras 5 intentos fallidos de login (15 minutos).
+- Casilla "Mantener sesión iniciada" al iniciar sesión — controla si el token se guarda de forma persistente o solo mientras el navegador esté abierto.
+- Cambiar contraseña estando dentro de la cuenta (además de recuperarla si la olvidaste).
+- Límite de una solicitud de recuperación de contraseña por hora, para evitar spam de correos.

@@ -4,7 +4,8 @@ export default function Header({ active, cartCount, onCartClick }) {
   const navItems = [
     { label: 'CARTAS', href: '/' },
     { label: 'MAZOS', href: '/decks' },
-    { label: 'CUENTA', href: '/cuenta' }
+    { label: 'CUENTA', href: '/cuenta' },
+    { label: 'PRIVACIDAD', href: '/aviso-privacidad' }
   ];
 
   return (

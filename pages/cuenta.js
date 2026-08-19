@@ -1,19 +1,23 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Header from '../components/Header';
+import { saveToken, getToken, clearToken } from '../lib/clientAuth';
 
 export default function Cuenta() {
   const [account, setAccount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState('login');
   const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' });
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
   const [settings, setSettings] = useState({ name: '', phone: '', address: '' });
+  const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', newPassword2: '' });
+  const [pwMsg, setPwMsg] = useState('');
   const [orders, setOrders] = useState([]);
   const [view, setView] = useState('orders');
 
   useEffect(() => {
-    const token = localStorage.getItem('customer_token');
+    const token = getToken();
     if (!token) { setLoading(false); return; }
     fetch('/api/auth/me', { headers: { 'x-customer-token': token } })
       .then(r => r.json())
@@ -54,14 +58,14 @@ export default function Cuenta() {
     const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const d = await r.json();
     if (!r.ok) { setError(d.error || 'Error'); return; }
-    localStorage.setItem('customer_token', d.token);
+    saveToken(d.token, remember);
     setAccount(d.customer);
     setSettings({ name: d.customer.name || '', phone: d.customer.phone || '', address: d.customer.address || '' });
     loadOrders(d.token);
   }
 
   async function saveSettings() {
-    const token = localStorage.getItem('customer_token');
+    const token = getToken();
     const r = await fetch('/api/auth/me', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'x-customer-token': token },
@@ -73,8 +77,26 @@ export default function Cuenta() {
     alert('Datos actualizados.');
   }
 
+  async function changePassword() {
+    setPwMsg('');
+    if (!pwForm.newPassword || pwForm.newPassword !== pwForm.newPassword2) {
+      setPwMsg('Las contraseñas nuevas no coinciden.');
+      return;
+    }
+    const token = getToken();
+    const r = await fetch('/api/auth/me', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-customer-token': token },
+      body: JSON.stringify({ currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword })
+    });
+    const d = await r.json();
+    if (!r.ok) { setPwMsg(d.error || 'Error'); return; }
+    setPwMsg('Contraseña actualizada.');
+    setPwForm({ currentPassword: '', newPassword: '', newPassword2: '' });
+  }
+
   function logout() {
-    localStorage.removeItem('customer_token');
+    clearToken();
     setAccount(null);
   }
 
@@ -114,6 +136,11 @@ export default function Cuenta() {
             <div className="field"><label>Teléfono (opcional)</label><input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
           )}
           <div className="field"><label>Contraseña</label><input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} style={{ width: 'auto' }} id="remember" />
+            <label htmlFor="remember" style={{ margin: 0, fontSize: '0.85rem' }}>Mantener sesión iniciada en este dispositivo</label>
+          </div>
 
           {error && <p className="hint" style={{ color: 'var(--blood)' }}>{error}</p>}
           <button className="primary" style={{ width: '100%' }} onClick={submitAuth}>{mode === 'login' ? 'Entrar' : 'Crear cuenta'}</button>
@@ -183,6 +210,15 @@ export default function Cuenta() {
             <p className="hint">Correo: {account.email} (no se puede cambiar aquí)</p>
             <button className="primary" onClick={saveSettings}>Guardar cambios</button>
             <button className="ghost" style={{ marginLeft: 10 }} onClick={logout}>Cerrar sesión</button>
+
+            <hr style={{ border: 'none', borderTop: '1px solid var(--line)', margin: '28px 0 20px' }} />
+
+            <h3>Cambiar contraseña</h3>
+            <div className="field"><label>Contraseña actual</label><input type="password" value={pwForm.currentPassword} onChange={e => setPwForm(f => ({ ...f, currentPassword: e.target.value }))} /></div>
+            <div className="field"><label>Nueva contraseña</label><input type="password" value={pwForm.newPassword} onChange={e => setPwForm(f => ({ ...f, newPassword: e.target.value }))} /></div>
+            <div className="field"><label>Repite la nueva contraseña</label><input type="password" value={pwForm.newPassword2} onChange={e => setPwForm(f => ({ ...f, newPassword2: e.target.value }))} /></div>
+            {pwMsg && <p className="hint" style={{ color: pwMsg === 'Contraseña actualizada.' ? 'var(--teal)' : 'var(--blood)' }}>{pwMsg}</p>}
+            <button className="ghost" onClick={changePassword}>Cambiar contraseña</button>
           </>
         )}
       </main>

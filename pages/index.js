@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Header from '../components/Header';
+import { getToken, clearToken } from '../lib/clientAuth';
 
 const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '';
 const SHOP_OWNER = process.env.NEXT_PUBLIC_SHOP_OWNER || '';
@@ -90,7 +91,7 @@ export default function Home() {
     loadInventory();
     fetch('/api/exchange-rate').then(r => r.json()).then(d => setRate(d.rate));
     fetch('/api/pricing-settings').then(r => r.json()).then(d => setPricingSettings(d.settings));
-    const token = typeof window !== 'undefined' ? localStorage.getItem('customer_token') : null;
+    const token = typeof window !== 'undefined' ? getToken() : null;
     if (token) {
       fetch('/api/auth/me', { headers: { 'x-customer-token': token } })
         .then(r => r.json())
@@ -184,7 +185,7 @@ export default function Home() {
       alert('Por favor deja al menos tu teléfono o tu correo, para poder contactarte sobre tu pedido.');
       return;
     }
-    const token = typeof window !== 'undefined' ? localStorage.getItem('customer_token') : null;
+    const token = typeof window !== 'undefined' ? getToken() : null;
     try {
       const r = await fetch('/api/orders', {
         method: 'POST',
@@ -218,7 +219,7 @@ export default function Home() {
   }
 
   function logout() {
-    localStorage.removeItem('customer_token');
+    clearToken();
     setAccount(null);
     setCheckoutForm({ name: '', phone: '', email: '' });
   }
