@@ -236,6 +236,18 @@ export default function Admin() {
 
   // ---------- Modal de agregar/editar carta ----------
   const LANGUAGES = { en: 'Inglés', es: 'Español', ja: 'Japonés', de: 'Alemán', fr: 'Francés', it: 'Italiano', pt: 'Portugués', ru: 'Ruso', ko: 'Coreano', zhs: 'Chino simpl.', zht: 'Chino trad.' };
+  const COLOR_HEX = { W: '#e8dfc8', U: '#5ecbff', B: '#6b6b6b', R: '#ff5e5e', G: '#6dff8a' };
+  function ColorPips({ colors }) {
+    const list = (colors || '').split(',').filter(Boolean);
+    if (list.length === 0) return <span title="Incoloro" style={{ display: 'inline-block', width: 12, height: 12, borderRadius: '50%', background: '#c9c4b8', border: '1px solid var(--line)' }} />;
+    return (
+      <span style={{ display: 'inline-flex', gap: 3 }}>
+        {list.map(c => (
+          <span key={c} title={c} style={{ width: 12, height: 12, borderRadius: '50%', background: COLOR_HEX[c] || '#888', border: '1px solid var(--line)', display: 'inline-block' }} />
+        ))}
+      </span>
+    );
+  }
   const [modalItem, setModalItem] = useState(null);
 
   function openAddModal(card) {
@@ -1030,6 +1042,7 @@ export default function Admin() {
             <div className="info">
               <div className="name">{c.name}</div>
               <div className="set">{c.set_name}</div>
+              <div style={{ margin: '2px 0' }}><ColorPips colors={c.colors} /></div>
               <div className="price mono">{c.usd ? `$${c.usd} USD ref.` : 'Sin precio ref.'}</div>
               <button className="ghost" onClick={() => openAddModal(c)}>Agregar a inventario</button>
             </div>
@@ -1082,6 +1095,7 @@ export default function Admin() {
             <div className="art">{it.img && <img src={it.img} alt={it.name} />}</div>
             <div className="info">
               <div className="name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{it.name} {it.foil && <span className="foil-badge" title="Foil" />}</div>
+              <div style={{ margin: '2px 0' }}><ColorPips colors={it.colors} /></div>
               <div className="set">
                 {it.condition} · x{it.rawQty}{it.reserved > 0 ? ` (${it.reserved} apartadas, ${it.qty} libres)` : ''} · {LANGUAGES[it.language] || it.language}
                 {it.views > 0 && <span> · 👁 {it.views}</span>}
