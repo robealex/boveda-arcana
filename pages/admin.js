@@ -1012,18 +1012,22 @@ export default function Admin() {
           </div>
 
           <label>Colores exactos</label>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6, marginBottom: 14 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 6, marginBottom: 14 }}>
             {Object.entries(COLOR_CODES).map(([code, label]) => (
               <button
                 key={code}
-                className="ghost"
                 onClick={() => toggleExColor(code)}
+                title={label}
                 style={{
-                  borderColor: exColors.includes(code) ? 'var(--gold)' : 'var(--line)',
-                  background: exColors.includes(code) ? 'rgba(201,162,39,0.12)' : 'transparent',
-                  color: exColors.includes(code) ? 'var(--gold)' : 'var(--parchment)'
+                  width: 30, height: 30, borderRadius: '50%', border: 'none', cursor: 'pointer', padding: 0,
+                  background: 'transparent',
+                  opacity: exColors.includes(code) ? 1 : 0.4,
+                  transform: exColors.includes(code) ? 'scale(1.15)' : 'scale(1)',
+                  transition: 'all 0.15s'
                 }}
-              >{label}</button>
+              >
+                <img src={`https://svgs.scryfall.io/card-symbols/${code}.svg`} alt={label} style={{ width: '100%', height: '100%' }} />
+              </button>
             ))}
             <button className="ghost" onClick={() => setExColors(['W', 'U', 'B', 'R', 'G'])}>Penta (5 colores)</button>
             {exColors.length > 0 && <button className="ghost" onClick={() => setExColors([])}>Limpiar</button>}
@@ -1704,15 +1708,17 @@ export default function Admin() {
             </div>
 
             <label>Colores</label>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '6px 0 14px' }}>
-              {Object.entries({ W: 'W', U: 'U', B: 'B', R: 'R', G: 'G' }).map(([code]) => (
-                <button key={code} className="ghost" onClick={() => toggleModalColor(code)}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '6px 0 14px' }}>
+              {Object.keys({ W: 1, U: 1, B: 1, R: 1, G: 1 }).map(code => (
+                <button key={code} onClick={() => toggleModalColor(code)} title={code}
                   style={{
-                    width: 34, padding: '6px 0',
-                    borderColor: modalItem.colors.includes(code) ? 'var(--gold)' : 'var(--line)',
-                    background: modalItem.colors.includes(code) ? 'rgba(201,162,39,0.12)' : 'transparent',
-                    color: modalItem.colors.includes(code) ? 'var(--gold)' : 'var(--parchment)'
-                  }}>{code}</button>
+                    width: 30, height: 30, borderRadius: '50%', border: 'none', cursor: 'pointer', padding: 0, background: 'transparent',
+                    opacity: modalItem.colors.includes(code) ? 1 : 0.4,
+                    transform: modalItem.colors.includes(code) ? 'scale(1.15)' : 'scale(1)',
+                    transition: 'all 0.15s'
+                  }}>
+                  <img src={`https://svgs.scryfall.io/card-symbols/${code}.svg`} alt={code} style={{ width: '100%', height: '100%' }} />
+                </button>
               ))}
             </div>
 

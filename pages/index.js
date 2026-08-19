@@ -323,13 +323,15 @@ export default function Home() {
                 onClick={() => toggleColor(code)}
                 title={info.label}
                 style={{
-                  width: 28, height: 28, borderRadius: '50%', border: '1px solid var(--line)', cursor: 'pointer',
-                  background: info.hex, fontWeight: 700, fontSize: '0.7rem', color: '#12100d',
+                  width: 28, height: 28, borderRadius: '50%', border: 'none', cursor: 'pointer', padding: 0,
+                  background: 'transparent',
                   opacity: colorFilter.includes(code) ? 1 : 0.4,
-                  transform: colorFilter.includes(code) ? 'scale(1.12)' : 'scale(1)',
-                  transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  transform: colorFilter.includes(code) ? 'scale(1.15)' : 'scale(1)',
+                  transition: 'all 0.15s'
                 }}
-              >{code}</button>
+              >
+                <img src={`https://svgs.scryfall.io/card-symbols/${code}.svg`} alt={info.label} style={{ width: '100%', height: '100%' }} />
+              </button>
             ))}
             <button
               onClick={() => setColorFilter(colorFilter.length === 5 ? [] : ['W', 'U', 'B', 'R', 'G'])}
