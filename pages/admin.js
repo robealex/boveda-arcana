@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import ThemeToggle from '../components/ThemeToggle';
 
+const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '';
+
 export default function Admin() {
   const [pw, setPw] = useState('');
   const [authed, setAuthed] = useState(false);
@@ -876,21 +878,41 @@ export default function Admin() {
               BÓVEDA ARCANA <span style={{ color: 'var(--muted)', fontSize: '0.9rem', fontWeight: 600 }}>· ADMIN</span>
             </span>
           </a>
-          <ThemeToggle />
+
+          <nav style={{ display: 'flex', gap: 22, flexWrap: 'wrap' }}>
+            {[
+              ['inventory', 'INVENTARIO'], ['orders', 'PEDIDOS'], ['users', 'USUARIOS'],
+              ['stats', 'ESTADÍSTICAS'], ['pricing', 'PRECIOS'], ['decks', 'DECKS']
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setView(key)}
+                style={{
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.8rem', fontWeight: 600,
+                  paddingBottom: 4, fontFamily: 'Inter',
+                  color: view === key ? 'var(--gold)' : 'var(--muted)',
+                  borderBottom: view === key ? '2px solid var(--gold)' : '2px solid transparent'
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {WA_NUMBER && (
+              <a href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Hola, necesito soporte con Bóveda Arcana')}`} target="_blank" rel="noreferrer">
+                <button className="ghost" style={{ fontSize: '0.8rem' }}>💬 Contacto / Soporte</button>
+              </a>
+            )}
+            <ThemeToggle />
+          </div>
         </div>
       </div>
 
     <main>
       <h2>Panel de administrador</h2>
-
-      <div className="tabs" style={{ justifyContent: 'flex-start', marginBottom: 28 }}>
-        <button className={`tab-btn ${view === 'inventory' ? 'active' : ''}`} onClick={() => setView('inventory')}>Inventario</button>
-        <button className={`tab-btn ${view === 'orders' ? 'active' : ''}`} onClick={() => setView('orders')}>Pedidos</button>
-        <button className={`tab-btn ${view === 'users' ? 'active' : ''}`} onClick={() => setView('users')}>Usuarios</button>
-        <button className={`tab-btn ${view === 'stats' ? 'active' : ''}`} onClick={() => setView('stats')}>Estadísticas</button>
-        <button className={`tab-btn ${view === 'pricing' ? 'active' : ''}`} onClick={() => setView('pricing')}>Precios</button>
-        <button className={`tab-btn ${view === 'decks' ? 'active' : ''}`} onClick={() => setView('decks')}>Decks</button>
-      </div>
 
       {view === 'inventory' && (
       <>

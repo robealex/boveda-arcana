@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
-import ThemeToggle from '../components/ThemeToggle';
+import Header from '../components/Header';
 
 export default function Cuenta() {
   const [account, setAccount] = useState(null);
@@ -94,12 +94,11 @@ export default function Cuenta() {
           <title>Inicia sesión o crea tu cuenta | Bóveda Arcana</title>
           <meta name="description" content="Crea una cuenta gratis en Bóveda Arcana para guardar tus datos y ver tu historial de compras de cartas de Magic: The Gathering. No es obligatoria para comprar." />
         </Head>
+        <Header active="CUENTA" cartCount={0} onCartClick={() => window.location.href = '/'} />
         <div className="hero">
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}><ThemeToggle /></div>
           <div className="eyebrow">Bóveda Arcana</div>
           <h1>Mi cuenta</h1>
           <p className="sub">Crea una cuenta para guardar tus datos y ver tu historial de compras automáticamente. No es necesario para comprar — también puedes seguir comprando como invitado.</p>
-          <p style={{ marginTop: 10 }}><a href="/" style={{ color: 'var(--gold)', fontSize: '0.85rem' }}>← Volver a la tienda</a></p>
         </div>
         <main style={{ maxWidth: 400 }}>
           <div className="tabs" style={{ justifyContent: 'flex-start', marginBottom: 20 }}>
@@ -144,11 +143,10 @@ export default function Cuenta() {
         <title>Mi cuenta | Bóveda Arcana</title>
         <meta name="robots" content="noindex, nofollow" />
       </Head>
+      <Header active="CUENTA" cartCount={0} onCartClick={() => window.location.href = '/'} />
       <div className="hero">
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}><ThemeToggle /></div>
         <div className="eyebrow">Bóveda Arcana</div>
         <h1>Hola, {account.name}</h1>
-        <p style={{ marginTop: -6 }}><a href="/" style={{ color: 'var(--gold)', fontSize: '0.85rem' }}>← Volver a la tienda</a></p>
         <div className="tabs" style={{ marginTop: 14 }}>
           <button className={`tab-btn ${view === 'orders' ? 'active' : ''}`} onClick={() => setView('orders')}>Mis compras</button>
           <button className={`tab-btn ${view === 'settings' ? 'active' : ''}`} onClick={() => setView('settings')}>Configuración</button>
