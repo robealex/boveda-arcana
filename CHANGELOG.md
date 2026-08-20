@@ -105,3 +105,6 @@ Registro de todo lo construido hasta esta versión.
 - Casilla "Mantener sesión iniciada" al iniciar sesión — controla si el token se guarda de forma persistente o solo mientras el navegador esté abierto.
 - Cambiar contraseña estando dentro de la cuenta (además de recuperarla si la olvidaste).
 - Límite de una solicitud de recuperación de contraseña por hora, para evitar spam de correos.
+
+## Menú móvil
+- Menú hamburguesa (☰) en pantallas chicas, tanto en el header de la tienda como en el del panel de admin — el nav completo, el carrito, el tema, y el botón de contacto se acomodan en un desplegable en vez de apretarse en una sola fila.
