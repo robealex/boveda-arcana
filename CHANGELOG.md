@@ -108,3 +108,7 @@ Registro de todo lo construido hasta esta versión.
 
 ## Menú móvil
 - Menú hamburguesa (☰) en pantallas chicas, tanto en el header de la tienda como en el del panel de admin — el nav completo, el carrito, el tema, y el botón de contacto se acomodan en un desplegable en vez de apretarse en una sola fila.
+
+## Rentabilidad
+- Campo "Costo de adquisición" por carta (lo que pagaste por conseguirla), opcional, editable al agregar o editar.
+- Nueva pestaña "Rentabilidad" en admin: tabla con costo, precio actual, precio de mercado más reciente, margen actual (precio - costo), comparación contra mercado, cuántas se han vendido, y ganancia realizada en ventas confirmadas — para saber de un vistazo si le estás ganando a cada carta con el precio de hoy.

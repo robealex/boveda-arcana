@@ -257,7 +257,7 @@ export default function Admin() {
     setModalItem({
       mode: 'add',
       name: card.name, set_name: card.set_name || '', img: card.img || '',
-      price: card.usd || '', original_price: '', qty: 1, condition: 'Near Mint',
+      price: card.usd || '', original_price: '', cost_usd: '', qty: 1, condition: 'Near Mint',
       colors: (card.colors || '').split(',').filter(Boolean),
       rarity: card.rarity || '', type_line: card.type_line || '',
       foil: Boolean(card.foil), language: card.lang || 'en',
@@ -277,6 +277,7 @@ export default function Admin() {
       mode: 'edit', id: it.id,
       name: it.name, set_name: it.setName || '', img: it.img || '',
       price: Number(it.price), original_price: it.originalPrice !== null && it.originalPrice !== undefined ? Number(it.originalPrice) : '',
+      cost_usd: it.costUsd !== null && it.costUsd !== undefined ? Number(it.costUsd) : '',
       qty: it.rawQty, condition: it.condition || 'Near Mint',
       colors: (it.colors || '').split(',').filter(Boolean),
       rarity: it.rarity || '', type_line: it.typeLine || '',
@@ -291,6 +292,7 @@ export default function Admin() {
       mode: 'add',
       name: it.name, set_name: it.setName || '', img: it.img || '',
       price: Number(it.price), original_price: it.originalPrice !== null && it.originalPrice !== undefined ? Number(it.originalPrice) : '',
+      cost_usd: it.costUsd !== null && it.costUsd !== undefined ? Number(it.costUsd) : '',
       qty: 1, condition: it.condition || 'Near Mint',
       colors: (it.colors || '').split(',').filter(Boolean),
       rarity: it.rarity || '', type_line: it.typeLine || '',
@@ -334,6 +336,7 @@ export default function Admin() {
       name: m.name.trim(), set_name: m.set_name, img: m.img,
       price: parseFloat(m.price),
       original_price: m.original_price === '' ? null : parseFloat(m.original_price),
+      cost_usd: m.cost_usd === '' || m.cost_usd === undefined ? null : parseFloat(m.cost_usd),
       qty: parseInt(m.qty), condition: m.condition,
       colors: m.colors.join(','), rarity: m.rarity, type_line: m.type_line,
       foil: m.foil, language: m.language, stripe_link: m.stripe_link, scryfall_uri: m.scryfall_uri,
@@ -371,6 +374,14 @@ export default function Admin() {
   useEffect(() => {
     if (authed && view === 'stats') {
       fetch('/api/stats', { headers: { 'x-admin-password': pw } }).then(r => r.json()).then(setStats);
+    }
+  }, [authed, view]);
+
+  const [profitRows, setProfitRows] = useState(null);
+  const [profitSort, setProfitSort] = useState('margin_asc');
+  useEffect(() => {
+    if (authed && view === 'profit') {
+      fetch('/api/profitability', { headers: { 'x-admin-password': pw } }).then(r => r.json()).then(d => setProfitRows(d.rows || []));
     }
   }, [authed, view]);
 
@@ -883,7 +894,7 @@ export default function Admin() {
           <nav className="header-nav-desktop">
             {[
               ['inventory', 'INVENTARIO'], ['orders', 'PEDIDOS'], ['users', 'USUARIOS'],
-              ['stats', 'ESTADÍSTICAS'], ['pricing', 'PRECIOS'], ['decks', 'DECKS']
+              ['stats', 'ESTADÍSTICAS'], ['profit', 'RENTABILIDAD'], ['pricing', 'PRECIOS'], ['decks', 'DECKS']
             ].map(([key, label]) => (
               <button
                 key={key}
@@ -918,7 +929,7 @@ export default function Admin() {
         <div className={`header-mobile-menu ${adminMobileOpen ? 'open' : ''}`}>
           {[
             ['inventory', 'INVENTARIO'], ['orders', 'PEDIDOS'], ['users', 'USUARIOS'],
-            ['stats', 'ESTADÍSTICAS'], ['pricing', 'PRECIOS'], ['decks', 'DECKS']
+            ['stats', 'ESTADÍSTICAS'], ['profit', 'RENTABILIDAD'], ['pricing', 'PRECIOS'], ['decks', 'DECKS']
           ].map(([key, label]) => (
             <button key={key} className="mm-btn" style={{ color: view === key ? 'var(--gold)' : 'var(--parchment)' }} onClick={() => { setView(key); setAdminMobileOpen(false); }}>
               {label}
@@ -1460,6 +1471,73 @@ export default function Admin() {
         </div>
       )}
 
+      {view === 'profit' && (
+        <div>
+          <h3 style={{ marginTop: 8 }}>Rentabilidad por carta</h3>
+          <p className="hint" style={{ marginTop: -6 }}>
+            Compara lo que te costó conseguir cada carta contra tu precio actual y el precio de mercado más reciente.
+            Si no le pusiste "Costo de adquisición" al agregarla, edítala para agregarlo y aquí se calcula solo.
+          </p>
+
+          {!profitRows && <p className="hint">Cargando...</p>}
+          {profitRows && profitRows.length === 0 && <p className="hint">Todavía no tienes cartas en inventario.</p>}
+
+          {profitRows && profitRows.length > 0 && (
+            <>
+              <div style={{ marginBottom: 12 }}>
+                <select value={profitSort} onChange={e => setProfitSort(e.target.value)} style={{ width: 240 }}>
+                  <option value="margin_asc">Margen actual: menor a mayor</option>
+                  <option value="margin_desc">Margen actual: mayor a menor</option>
+                  <option value="realized_desc">Ganancia realizada: mayor a menor</option>
+                  <option value="name">Nombre (A-Z)</option>
+                </select>
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Carta</th><th>Costo</th><th>Precio actual</th><th>Mercado (últ.)</th>
+                      <th>Margen actual</th><th>vs. mercado</th><th>Vendidas</th><th>Ganancia realizada</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...profitRows].sort((a, b) => {
+                      if (profitSort === 'name') return a.name.localeCompare(b.name);
+                      if (profitSort === 'margin_desc') return (b.marginCurrent ?? -Infinity) - (a.marginCurrent ?? -Infinity);
+                      if (profitSort === 'realized_desc') return (b.realizedProfit ?? -Infinity) - (a.realizedProfit ?? -Infinity);
+                      return (a.marginCurrent ?? Infinity) - (b.marginCurrent ?? Infinity);
+                    }).map(r => (
+                      <tr key={r.id}>
+                        <td>{r.name} <span className="hint">({r.condition})</span></td>
+                        <td className="mono">{r.cost !== null ? `$${r.cost.toFixed(2)}` : <span className="hint">sin dato</span>}</td>
+                        <td className="mono">${r.price.toFixed(2)}</td>
+                        <td className="mono hint">{r.marketRef !== null ? `$${r.marketRef.toFixed(2)}` : '—'}</td>
+                        <td className="mono" style={{ color: r.marginCurrent === null ? 'var(--muted)' : r.marginCurrent >= 0 ? 'var(--teal)' : 'var(--blood)' }}>
+                          {r.marginCurrent !== null ? `${r.marginCurrent >= 0 ? '+' : ''}$${r.marginCurrent.toFixed(2)}${r.marginPct !== null ? ` (${r.marginPct}%)` : ''}` : '—'}
+                        </td>
+                        <td className="mono" style={{ color: r.vsMarket === null ? 'var(--muted)' : r.vsMarket >= 0 ? 'var(--teal)' : 'var(--blood)' }}>
+                          {r.vsMarket !== null ? `${r.vsMarket >= 0 ? '+' : ''}$${r.vsMarket.toFixed(2)}` : '—'}
+                        </td>
+                        <td>{r.soldQty}</td>
+                        <td className="mono" style={{ color: r.realizedProfit === null ? 'var(--muted)' : r.realizedProfit >= 0 ? 'var(--teal)' : 'var(--blood)' }}>
+                          {r.realizedProfit !== null ? `${r.realizedProfit >= 0 ? '+' : ''}$${r.realizedProfit.toFixed(2)}` : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="hint" style={{ marginTop: 10 }}>
+                "Margen actual" compara tu precio de venta de hoy contra tu costo. "vs. mercado" compara tu precio contra
+                la referencia de Scryfall más reciente que se guardó (verde = vendes arriba del mercado). "Ganancia realizada"
+                es lo que ya ganaste en ventas confirmadas de esa carta específica.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
       {view === 'decks' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -1689,6 +1767,11 @@ export default function Admin() {
                 )}
               </div>
               <div className="field" style={{ flex: 1 }}><label>Cantidad</label><input type="number" value={modalItem.qty} onChange={e => setModalItem(m => ({ ...m, qty: e.target.value }))} /></div>
+            </div>
+
+            <div className="field">
+              <label>Costo de adquisición (opcional, lo que TÚ pagaste por ella)</label>
+              <input type="number" value={modalItem.cost_usd} onChange={e => setModalItem(m => ({ ...m, cost_usd: e.target.value }))} placeholder="ej. 8.00" />
             </div>
 
             <div className="field">

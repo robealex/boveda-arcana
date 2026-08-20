@@ -8,11 +8,12 @@ function serialize(item, reservedMap, isAdmin) {
     ...item,
     price: Number(item.price),
     originalPrice: item.originalPrice !== null && item.originalPrice !== undefined ? Number(item.originalPrice) : null,
+    costUsd: item.costUsd !== null && item.costUsd !== undefined ? Number(item.costUsd) : null,
     rawQty: item.qty,
     reserved,
     qty: Math.max(0, item.qty - reserved)
   };
-  if (!isAdmin) delete out.notes;
+  if (!isAdmin) { delete out.notes; delete out.costUsd; }
   return out;
 }
 
@@ -26,13 +27,14 @@ async function getReservedMap() {
 }
 
 function buildData(body) {
-  const { name, set_name, img, price, original_price, qty, condition, stripe_link, colors, rarity, type_line, foil, language, scryfall_uri, notes } = body;
+  const { name, set_name, img, price, original_price, qty, condition, stripe_link, colors, rarity, type_line, foil, language, scryfall_uri, notes, cost_usd } = body;
   const data = {};
   if (name !== undefined) data.name = name;
   if (set_name !== undefined) data.setName = set_name || '';
   if (img !== undefined) data.img = img || '';
   if (price !== undefined) data.price = price;
   if (original_price !== undefined) data.originalPrice = original_price === '' || original_price === null ? null : original_price;
+  if (cost_usd !== undefined) data.costUsd = cost_usd === '' || cost_usd === null ? null : cost_usd;
   if (qty !== undefined) data.qty = qty;
   if (condition !== undefined) data.condition = condition || 'Near Mint';
   if (stripe_link !== undefined) data.stripeLink = stripe_link || '';
