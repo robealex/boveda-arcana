@@ -5,6 +5,7 @@ const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '';
 
 export default function Admin() {
   const [pw, setPw] = useState('');
+  const [adminMobileOpen, setAdminMobileOpen] = useState(false);
   const [authed, setAuthed] = useState(false);
   const [items, setItems] = useState([]);
   const [q, setQ] = useState('');
@@ -879,7 +880,7 @@ export default function Admin() {
             </span>
           </a>
 
-          <nav style={{ display: 'flex', gap: 22, flexWrap: 'wrap' }}>
+          <nav className="header-nav-desktop">
             {[
               ['inventory', 'INVENTARIO'], ['orders', 'PEDIDOS'], ['users', 'USUARIOS'],
               ['stats', 'ESTADÍSTICAS'], ['pricing', 'PRECIOS'], ['decks', 'DECKS']
@@ -900,7 +901,7 @@ export default function Admin() {
             ))}
           </nav>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="header-nav-desktop" style={{ gap: 10 }}>
             {WA_NUMBER && (
               <a href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Hola, necesito soporte con Bóveda Arcana')}`} target="_blank" rel="noreferrer">
                 <button className="ghost" style={{ fontSize: '0.8rem' }}>💬 Contacto / Soporte</button>
@@ -908,6 +909,27 @@ export default function Admin() {
             )}
             <ThemeToggle />
           </div>
+
+          <button className="header-mobile-btn" onClick={() => setAdminMobileOpen(o => !o)} aria-label="Menú">
+            {adminMobileOpen ? '✕' : '☰'}
+          </button>
+        </div>
+
+        <div className={`header-mobile-menu ${adminMobileOpen ? 'open' : ''}`}>
+          {[
+            ['inventory', 'INVENTARIO'], ['orders', 'PEDIDOS'], ['users', 'USUARIOS'],
+            ['stats', 'ESTADÍSTICAS'], ['pricing', 'PRECIOS'], ['decks', 'DECKS']
+          ].map(([key, label]) => (
+            <button key={key} className="mm-btn" style={{ color: view === key ? 'var(--gold)' : 'var(--parchment)' }} onClick={() => { setView(key); setAdminMobileOpen(false); }}>
+              {label}
+            </button>
+          ))}
+          {WA_NUMBER && (
+            <a className="mm-btn" href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Hola, necesito soporte con Bóveda Arcana')}`} target="_blank" rel="noreferrer">
+              💬 Contacto / Soporte
+            </a>
+          )}
+          <div className="mm-btn" style={{ cursor: 'default' }}><ThemeToggle /></div>
         </div>
       </div>
 
