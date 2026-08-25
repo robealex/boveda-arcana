@@ -16,6 +16,7 @@ const LANGUAGES = { en: 'Inglés', es: 'Español', ja: 'Japonés', de: 'Alemán'
 export default function Home() {
   const [items, setItems] = useState([]);
   const [filter, setFilter] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [cart, setCart] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [rate, setRate] = useState(null);
@@ -66,6 +67,7 @@ export default function Home() {
   const [alertEmail, setAlertEmail] = useState('');
   const [alertSent, setAlertSent] = useState(false);
   const [account, setAccount] = useState(null);
+  const [wishlist, setWishlist] = useState(new Set());
   const [checkoutForm, setCheckoutForm] = useState({ name: '', phone: '', email: '' });
   const [showCheckoutForm, setShowCheckoutForm] = useState(false);
   const [page, setPage] = useState(0);
@@ -101,8 +103,28 @@ export default function Home() {
             setCheckoutForm({ name: d.customer.name || '', phone: d.customer.phone || '', email: d.customer.email || '' });
           }
         });
+      fetch('/api/wishlist', { headers: { 'x-customer-token': token } })
+        .then(r => r.json())
+        .then(d => setWishlist(new Set((d.items || []).map(it => it.id))));
     }
   }, []);
+
+  async function toggleWishlist(it, e) {
+    if (e) e.stopPropagation();
+    const token = getToken();
+    if (!token) { window.location.href = '/cuenta'; return; }
+    const inWishlist = wishlist.has(it.id);
+    setWishlist(prev => {
+      const next = new Set(prev);
+      inWishlist ? next.delete(it.id) : next.add(it.id);
+      return next;
+    });
+    if (inWishlist) {
+      await fetch(`/api/wishlist?inventoryId=${it.id}`, { method: 'DELETE', headers: { 'x-customer-token': token } });
+    } else {
+      await fetch('/api/wishlist', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-customer-token': token }, body: JSON.stringify({ inventoryId: it.id }) });
+    }
+  }
 
   useEffect(() => {
     if (!detailItem) return;
@@ -124,6 +146,10 @@ export default function Home() {
     });
     if (r.ok) setAlertSent(true);
   }
+
+  const nameSuggestions = filter.trim()
+    ? [...new Set(items.filter(it => it.name.toLowerCase().includes(filter.toLowerCase())).map(it => it.name))].slice(0, 6)
+    : [];
 
   const visible = items
     .filter(it => it.name.toLowerCase().includes(filter.toLowerCase()))
@@ -369,8 +395,32 @@ export default function Home() {
         </div>
 
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
-          <div className="field" style={{ maxWidth: 300, marginBottom: 0 }}>
-            <input placeholder="Filtrar por nombre..." value={filter} onChange={e => setFilter(e.target.value)} />
+          <div className="field" style={{ maxWidth: 300, marginBottom: 0, position: 'relative' }}>
+            <input
+              placeholder="Filtrar por nombre..." value={filter}
+              onChange={e => { setFilter(e.target.value); setShowSuggestions(true); }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            />
+            {showSuggestions && filter.trim() && nameSuggestions.length > 0 && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30, marginTop: 4,
+                background: 'var(--ink2)', border: '1px solid var(--line)', borderRadius: 8,
+                maxHeight: 220, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
+              }}>
+                {nameSuggestions.map(name => (
+                  <div
+                    key={name}
+                    onMouseDown={() => { setFilter(name); setShowSuggestions(false); }}
+                    style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.85rem', borderBottom: '1px solid var(--line)' }}
+                    onMouseOver={e => e.currentTarget.style.background = 'var(--ink3)'}
+                    onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {name}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           {colorFilter.length > 0 && <button className="ghost" onClick={() => setColorFilter([])}>Limpiar colores</button>}
         </div>
@@ -395,6 +445,13 @@ export default function Home() {
             return (
               <div className="card" key={it.id} style={{ opacity: soldOut ? 0.55 : 1, cursor: 'pointer', position: 'relative' }} onClick={() => setDetailItem(it)}>
                 <div className="art">{it.img && <img src={it.img} alt={`Carta ${it.name} de Magic: The Gathering en venta`} />}</div>
+                <button
+                  onClick={e => toggleWishlist(it, e)}
+                  title={wishlist.has(it.id) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                  style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontSize: '0.95rem', zIndex: 2 }}
+                >
+                  {wishlist.has(it.id) ? '❤️' : '🤍'}
+                </button>
                 {disc && !soldOut && (
                   <span style={{ position: 'absolute', top: 8, right: 8, background: 'var(--blood)', color: 'var(--parchment)', fontWeight: 800, fontSize: '0.8rem', padding: '4px 9px', borderRadius: 999, zIndex: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
                     -{disc.pctOff}%
@@ -536,6 +593,9 @@ export default function Home() {
             {detailItem.img && <img src={detailItem.img} alt={`Imagen de la carta ${detailItem.name}, edición ${detailItem.setName}`} style={{ width: '100%', borderRadius: 8, marginBottom: 14 }} />}
             <h3 style={{ marginTop: 0, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
               {detailItem.foil && <span className="foil-badge" title="Foil" />}{detailItem.name}
+              <button onClick={e => toggleWishlist(detailItem, e)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.1rem' }}>
+                {wishlist.has(detailItem.id) ? '❤️' : '🤍'}
+              </button>
               {discountInfo(detailItem) && detailItem.qty > 0 && (
                 <span style={{ background: 'var(--blood)', color: 'var(--parchment)', fontWeight: 800, fontSize: '0.75rem', padding: '3px 9px', borderRadius: 999 }}>
                   -{discountInfo(detailItem).pctOff}%

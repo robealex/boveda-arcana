@@ -112,3 +112,16 @@ Registro de todo lo construido hasta esta versión.
 ## Rentabilidad
 - Campo "Costo de adquisición" por carta (lo que pagaste por conseguirla), opcional, editable al agregar o editar.
 - Nueva pestaña "Rentabilidad" en admin: tabla con costo, precio actual, precio de mercado más reciente, margen actual (precio - costo), comparación contra mercado, cuántas se han vendido, y ganancia realizada en ventas confirmadas — para saber de un vistazo si le estás ganando a cada carta con el precio de hoy.
+
+## Cuentas de staff con permisos limitados
+- Nuevo login de dos modos en `/admin`: "Dueño" (la contraseña única de siempre) o "Staff" (correo y contraseña individual).
+- Pestaña "Staff" (solo para el dueño) para crear, editar, desactivar o eliminar cuentas de staff, con rol "staff" (acceso limitado) o "dueño" (acceso completo).
+- El staff puede administrar Inventario, Pedidos y Decks. No puede ver ni tocar Usuarios, Estadísticas, Rentabilidad, ni Precios generales — esas secciones se ocultan del menú y también están bloqueadas del lado del servidor, no solo escondidas visualmente.
+- Botón de "Cerrar sesión" visible en el header de admin.
+- Bloqueo por intentos fallidos también para el login de staff, igual que en cuentas de clientes.
+
+## Otras mejoras
+- Autocompletar con sugerencias al escribir en el buscador de nombre de la tienda.
+- Aviso de "poco stock" (⚠) visible solo para ti en el inventario del admin, cuando quedan 1 o 2 disponibles.
+- Lista de deseos (favoritos): corazón en cada carta para clientes con cuenta, con su propia sección "Favoritos" en Mi cuenta.
+- Se quitó el título redundante "Panel de administrador" ya que el encabezado ya dice "· ADMIN".

@@ -2,9 +2,16 @@ import { useEffect, useState } from 'react';
 import ThemeToggle from '../components/ThemeToggle';
 
 const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '';
+const ADMIN_TABS = [
+  ['inventory', 'INVENTARIO'], ['orders', 'PEDIDOS'], ['users', 'USUARIOS', true],
+  ['stats', 'ESTADÍSTICAS', true], ['profit', 'RENTABILIDAD', true], ['pricing', 'PRECIOS', true],
+  ['decks', 'DECKS'], ['staff', 'STAFF', true]
+];
 
 export default function Admin() {
   const [pw, setPw] = useState('');
+  const [role, setRole] = useState('owner');
+  const [staffName, setStaffName] = useState('');
   const [adminMobileOpen, setAdminMobileOpen] = useState(false);
   const [authed, setAuthed] = useState(false);
   const [items, setItems] = useState([]);
@@ -176,6 +183,41 @@ export default function Admin() {
 
   const [stats, setStats] = useState(null);
 
+  // ---------- Staff ----------
+  const [staffUsers, setStaffUsers] = useState([]);
+  const [staffForm, setStaffForm] = useState(null);
+  function loadStaff() {
+    fetch('/api/admin-users', { headers: { 'x-admin-password': pw } }).then(r => r.json()).then(d => setStaffUsers(d.users || []));
+  }
+  useEffect(() => { if (authed && view === 'staff' && role === 'owner') loadStaff(); }, [authed, view, role]);
+
+  async function saveStaff() {
+    const url = staffForm.id ? `/api/admin-users?id=${staffForm.id}` : '/api/admin-users';
+    const method = staffForm.id ? 'PATCH' : 'POST';
+    const body = { name: staffForm.name, email: staffForm.email, role: staffForm.role };
+    if (staffForm.password) body.password = staffForm.password;
+    if (!staffForm.id) body.password = staffForm.password;
+    const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'x-admin-password': pw }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) { alert(d.error || 'Error'); return; }
+    setStaffForm(null);
+    loadStaff();
+  }
+
+  async function toggleStaffActive(u) {
+    await fetch(`/api/admin-users?id=${u.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-admin-password': pw },
+      body: JSON.stringify({ active: !u.active })
+    });
+    loadStaff();
+  }
+
+  async function deleteStaff(id) {
+    if (!confirm('¿Eliminar este usuario de staff?')) return;
+    await fetch(`/api/admin-users?id=${id}`, { method: 'DELETE', headers: { 'x-admin-password': pw } });
+    loadStaff();
+  }
+
   const CONDITION_FIELD = {
     'Near Mint': 'nearMintPct', 'Lightly Played': 'lightlyPlayedPct', 'Moderately Played': 'moderatelyPlayedPct',
     'Heavily Played': 'heavilyPlayedPct', 'Damaged': 'damagedPct'
@@ -207,7 +249,9 @@ export default function Admin() {
 
   useEffect(() => {
     const saved = typeof window !== 'undefined' ? sessionStorage.getItem('admin_pw') : null;
-    if (saved) { setPw(saved); setAuthed(true); }
+    const savedRole = typeof window !== 'undefined' ? sessionStorage.getItem('admin_role') : null;
+    const savedName = typeof window !== 'undefined' ? sessionStorage.getItem('admin_name') : null;
+    if (saved) { setPw(saved); setRole(savedRole || 'owner'); setStaffName(savedName || ''); setAuthed(true); }
   }, []);
 
   useEffect(() => { if (authed) loadInventory(); }, [authed]);
@@ -218,7 +262,37 @@ export default function Admin() {
 
   function tryLogin() {
     sessionStorage.setItem('admin_pw', pw);
+    sessionStorage.setItem('admin_role', 'owner');
+    sessionStorage.removeItem('admin_name');
+    setRole('owner'); setStaffName('');
     setAuthed(true);
+  }
+
+  const [loginMode, setLoginMode] = useState('owner');
+  const [staffEmail, setStaffEmail] = useState('');
+  const [staffPw, setStaffPw] = useState('');
+  const [staffLoginError, setStaffLoginError] = useState('');
+
+  async function tryStaffLogin() {
+    setStaffLoginError('');
+    const r = await fetch('/api/admin-login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: staffEmail, password: staffPw })
+    });
+    const d = await r.json();
+    if (!r.ok) { setStaffLoginError(d.error || 'Error'); return; }
+    sessionStorage.setItem('admin_pw', d.token);
+    sessionStorage.setItem('admin_role', d.role);
+    sessionStorage.setItem('admin_name', d.name);
+    setPw(d.token); setRole(d.role); setStaffName(d.name);
+    setAuthed(true);
+  }
+
+  function adminLogout() {
+    sessionStorage.removeItem('admin_pw');
+    sessionStorage.removeItem('admin_role');
+    sessionStorage.removeItem('admin_name');
+    setAuthed(false); setPw(''); setRole('owner'); setStaffName('');
   }
 
   async function runSearch(query) {
@@ -368,6 +442,11 @@ export default function Admin() {
   function loadOrders() {
     fetch('/api/orders', { headers: { 'x-admin-password': pw } }).then(r => r.json()).then(d => setOrders(d.orders || []));
   }
+
+  useEffect(() => {
+    const restricted = ['users', 'stats', 'profit', 'pricing', 'staff'];
+    if (authed && role !== 'owner' && restricted.includes(view)) setView('inventory');
+  }, [authed, role, view]);
 
   useEffect(() => { if (authed && view === 'orders') loadOrders(); }, [authed, view]);
   useEffect(() => { if (authed && view === 'users') loadCustomers(); }, [authed, view]);
@@ -869,11 +948,34 @@ export default function Admin() {
       <main style={{ maxWidth: 360, marginTop: 100 }}>
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}><ThemeToggle /></div>
         <h2>Acceso de administrador</h2>
-        <div className="field">
-          <label>Contraseña</label>
-          <input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && tryLogin()} />
+
+        <div className="tabs" style={{ justifyContent: 'flex-start', marginBottom: 20 }}>
+          <button className={`tab-btn ${loginMode === 'owner' ? 'active' : ''}`} onClick={() => setLoginMode('owner')}>Dueño</button>
+          <button className={`tab-btn ${loginMode === 'staff' ? 'active' : ''}`} onClick={() => setLoginMode('staff')}>Staff</button>
         </div>
-        <button className="primary" onClick={tryLogin}>Entrar</button>
+
+        {loginMode === 'owner' && (
+          <>
+            <div className="field">
+              <label>Contraseña</label>
+              <input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && tryLogin()} />
+            </div>
+            <button className="primary" onClick={tryLogin}>Entrar</button>
+          </>
+        )}
+
+        {loginMode === 'staff' && (
+          <>
+            <div className="field"><label>Correo</label><input value={staffEmail} onChange={e => setStaffEmail(e.target.value)} /></div>
+            <div className="field">
+              <label>Contraseña</label>
+              <input type="password" value={staffPw} onChange={e => setStaffPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && tryStaffLogin()} />
+            </div>
+            {staffLoginError && <p className="hint" style={{ color: 'var(--blood)' }}>{staffLoginError}</p>}
+            <button className="primary" onClick={tryStaffLogin}>Entrar</button>
+            <p className="hint" style={{ marginTop: 10 }}>Pídele al dueño de la tienda que te dé de alta desde su panel.</p>
+          </>
+        )}
       </main>
     );
   }
@@ -892,10 +994,7 @@ export default function Admin() {
           </a>
 
           <nav className="header-nav-desktop">
-            {[
-              ['inventory', 'INVENTARIO'], ['orders', 'PEDIDOS'], ['users', 'USUARIOS'],
-              ['stats', 'ESTADÍSTICAS'], ['profit', 'RENTABILIDAD'], ['pricing', 'PRECIOS'], ['decks', 'DECKS']
-            ].map(([key, label]) => (
+            {ADMIN_TABS.filter(t => role === 'owner' || !t[2]).map(([key, label]) => (
               <button
                 key={key}
                 onClick={() => setView(key)}
@@ -913,11 +1012,13 @@ export default function Admin() {
           </nav>
 
           <div className="header-nav-desktop" style={{ gap: 10 }}>
+            {staffName && <span className="hint">Hola, {staffName} ({role === 'owner' ? 'dueño' : 'staff'})</span>}
             {WA_NUMBER && (
               <a href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Hola, necesito soporte con Bóveda Arcana')}`} target="_blank" rel="noreferrer">
                 <button className="ghost" style={{ fontSize: '0.8rem' }}>💬 Contacto / Soporte</button>
               </a>
             )}
+            <button className="ghost" style={{ fontSize: '0.8rem' }} onClick={adminLogout}>Cerrar sesión</button>
             <ThemeToggle />
           </div>
 
@@ -927,10 +1028,7 @@ export default function Admin() {
         </div>
 
         <div className={`header-mobile-menu ${adminMobileOpen ? 'open' : ''}`}>
-          {[
-            ['inventory', 'INVENTARIO'], ['orders', 'PEDIDOS'], ['users', 'USUARIOS'],
-            ['stats', 'ESTADÍSTICAS'], ['profit', 'RENTABILIDAD'], ['pricing', 'PRECIOS'], ['decks', 'DECKS']
-          ].map(([key, label]) => (
+          {ADMIN_TABS.filter(t => role === 'owner' || !t[2]).map(([key, label]) => (
             <button key={key} className="mm-btn" style={{ color: view === key ? 'var(--gold)' : 'var(--parchment)' }} onClick={() => { setView(key); setAdminMobileOpen(false); }}>
               {label}
             </button>
@@ -940,12 +1038,12 @@ export default function Admin() {
               💬 Contacto / Soporte
             </a>
           )}
+          <button className="mm-btn" onClick={adminLogout}>Cerrar sesión</button>
           <div className="mm-btn" style={{ cursor: 'default' }}><ThemeToggle /></div>
         </div>
       </div>
 
     <main>
-      <h2>Panel de administrador</h2>
 
       {view === 'inventory' && (
       <>
@@ -1142,8 +1240,8 @@ export default function Admin() {
             <button className={invView === 'cards' ? 'active' : ''} onClick={() => setInvView('cards')}>🎴 Tarjetas</button>
             <button className={invView === 'table' ? 'active' : ''} onClick={() => setInvView('table')}>📋 Tabla</button>
           </div>
-          <button className="ghost" onClick={() => downloadFile('/api/export-inventory', 'boveda-arcana-biblioteca.csv')}>Descargar biblioteca (CSV)</button>
-          <button className="ghost" style={{ borderColor: 'var(--blood)', color: 'var(--blood)' }} onClick={() => setWipeModal(true)}>Borrar toda la biblioteca</button>
+          {role === 'owner' && <button className="ghost" onClick={() => downloadFile('/api/export-inventory', 'boveda-arcana-biblioteca.csv')}>Descargar biblioteca (CSV)</button>}
+          {role === 'owner' && <button className="ghost" style={{ borderColor: 'var(--blood)', color: 'var(--blood)' }} onClick={() => setWipeModal(true)}>Borrar toda la biblioteca</button>}
         </div>
       </div>
 
@@ -1153,6 +1251,9 @@ export default function Admin() {
           <div className="card" key={it.id}>
             <div className="art">{it.img && <img src={it.img} alt={it.name} />}</div>
             <div className="info">
+              {it.qty > 0 && it.qty <= 2 && (
+                <span className="badge" style={{ background: 'var(--blood)' }}>⚠ Poco stock ({it.qty})</span>
+              )}
               <div className="name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{it.name} {it.foil && <span className="foil-badge" title="Foil" />}</div>
               <div style={{ margin: '2px 0' }}><ColorPips colors={it.colors} /></div>
               <div className="set">
@@ -1216,7 +1317,10 @@ export default function Admin() {
                           <div className="hint" style={{ fontSize: '0.7rem', marginTop: 2 }}>≈${(parseFloat(e.price) * rate).toFixed(2)} MXN</div>
                         )}
                       </td>
-                      <td><input type="number" value={e.qty ?? ''} onChange={ev => updateRowEdit(it.id, 'qty', ev.target.value)} style={{ width: 60 }} /></td>
+                      <td>
+                        <input type="number" value={e.qty ?? ''} onChange={ev => updateRowEdit(it.id, 'qty', ev.target.value)} style={{ width: 60 }} />
+                        {it.qty > 0 && it.qty <= 2 && <div className="hint" style={{ color: 'var(--blood)', fontSize: '0.68rem' }}>⚠ poco</div>}
+                      </td>
                       <td>
                         <select value={e.condition ?? 'Near Mint'} onChange={ev => updateRowEdit(it.id, 'condition', ev.target.value)}>
                           <option>Near Mint</option><option>Lightly Played</option><option>Moderately Played</option><option>Heavily Played</option><option>Damaged</option>
@@ -1266,7 +1370,7 @@ export default function Admin() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
             <h3 style={{ marginTop: 8, marginBottom: 0 }}>Pedidos ({orders.length})</h3>
-            <button className="ghost" onClick={() => downloadFile('/api/export-orders', 'boveda-arcana-pedidos.csv')}>Exportar pedidos confirmados (CSV)</button>
+            {role === 'owner' && <button className="ghost" onClick={() => downloadFile('/api/export-orders', 'boveda-arcana-pedidos.csv')}>Exportar pedidos confirmados (CSV)</button>}
           </div>
           {orders.length === 0 && <p className="hint">Todavía no hay pedidos.</p>}
           {orders.map(o => {
@@ -1534,6 +1638,61 @@ export default function Admin() {
                 es lo que ya ganaste en ventas confirmadas de esa carta específica.
               </p>
             </>
+          )}
+        </div>
+      )}
+
+      {view === 'staff' && role === 'owner' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h3 style={{ margin: 0 }}>Usuarios de staff ({staffUsers.length})</h3>
+            <button className="primary" onClick={() => setStaffForm({ id: null, name: '', email: '', role: 'staff', password: '' })}>+ Nuevo usuario</button>
+          </div>
+          <p className="hint" style={{ marginTop: -10, marginBottom: 20 }}>
+            El staff puede administrar Inventario, Pedidos y Decks. No ve Usuarios, Estadísticas, Rentabilidad ni Precios —
+            esa información solo la ves tú como dueño.
+          </p>
+
+          {staffUsers.map(u => (
+            <div key={u.id} style={{ background: 'var(--ink2)', border: '1px solid var(--line)', borderRadius: 10, padding: 16, marginBottom: 10, opacity: u.active ? 1 : 0.5 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                <div>
+                  <strong>{u.name}</strong>
+                  <span className="hint" style={{ marginLeft: 10 }}>{u.email}</span>
+                  <span className="badge" style={{ marginLeft: 10, background: u.role === 'owner' ? 'var(--gold)' : 'var(--teal)', color: 'var(--ink)' }}>{u.role === 'owner' ? 'Dueño' : 'Staff'}</span>
+                  {!u.active && <span className="hint" style={{ marginLeft: 10, color: 'var(--blood)' }}>Desactivado</span>}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="ghost" onClick={() => setStaffForm({ id: u.id, name: u.name, email: u.email, role: u.role, password: '' })}>Editar</button>
+                  <button className="ghost" onClick={() => toggleStaffActive(u)}>{u.active ? 'Desactivar' : 'Reactivar'}</button>
+                  <button className="ghost" onClick={() => deleteStaff(u.id)}>Eliminar</button>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {staffForm && (
+            <div className="modal-bg show">
+              <div className="modal" style={{ maxWidth: 380 }}>
+                <h3 style={{ marginTop: 0 }}>{staffForm.id ? 'Editar usuario' : 'Nuevo usuario de staff'}</h3>
+                <div className="field"><label>Nombre</label><input value={staffForm.name} onChange={e => setStaffForm(f => ({ ...f, name: e.target.value }))} /></div>
+                <div className="field"><label>Correo</label><input value={staffForm.email} onChange={e => setStaffForm(f => ({ ...f, email: e.target.value }))} disabled={Boolean(staffForm.id)} /></div>
+                <div className="field"><label>Rol</label>
+                  <select value={staffForm.role} onChange={e => setStaffForm(f => ({ ...f, role: e.target.value }))}>
+                    <option value="staff">Staff (acceso limitado)</option>
+                    <option value="owner">Dueño (acceso completo)</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label>{staffForm.id ? 'Nueva contraseña (dejar vacío para no cambiarla)' : 'Contraseña'}</label>
+                  <input type="password" value={staffForm.password} onChange={e => setStaffForm(f => ({ ...f, password: e.target.value }))} />
+                </div>
+                <div className="modal-actions">
+                  <button className="ghost" onClick={() => setStaffForm(null)}>Cancelar</button>
+                  <button className="primary" onClick={saveStaff}>Guardar</button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       )}

@@ -1,5 +1,5 @@
 import { prisma } from '../../lib/prisma';
-import { checkAdmin } from '../../lib/auth';
+import { checkOwner } from '../../lib/auth';
 
 async function getSettings() {
   let s = await prisma.pricingSettings.findUnique({ where: { id: 1 } });
@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'PATCH') {
-    if (!checkAdmin(req)) return res.status(401).json({ error: 'Password de administrador incorrecto' });
+    if (!checkOwner(req)) return res.status(401).json({ error: 'Solo el dueño puede cambiar los precios generales' });
     await getSettings();
     const {
       nearMintPct, lightlyPlayedPct, moderatelyPlayedPct, heavilyPlayedPct, damagedPct,

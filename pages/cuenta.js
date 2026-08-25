@@ -25,7 +25,7 @@ export default function Cuenta() {
         if (d.customer) {
           setAccount(d.customer);
           setSettings({ name: d.customer.name || '', phone: d.customer.phone || '', address: d.customer.address || '' });
-          loadOrders(token);
+          loadOrders(token); loadWishlist(token);
         }
         setLoading(false);
       })
@@ -36,6 +36,18 @@ export default function Cuenta() {
     fetch('/api/my-account-orders', { headers: { 'x-customer-token': token } })
       .then(r => r.json())
       .then(d => setOrders(d.orders || []));
+  }
+
+  const [wishlistItems, setWishlistItems] = useState([]);
+  function loadWishlist(token) {
+    fetch('/api/wishlist', { headers: { 'x-customer-token': token } })
+      .then(r => r.json())
+      .then(d => setWishlistItems(d.items || []));
+  }
+  async function removeWishlist(id) {
+    const token = getToken();
+    await fetch(`/api/wishlist?inventoryId=${id}`, { method: 'DELETE', headers: { 'x-customer-token': token } });
+    setWishlistItems(prev => prev.filter(it => it.id !== id));
   }
 
   const [forgotMode, setForgotMode] = useState(false);
@@ -62,6 +74,7 @@ export default function Cuenta() {
     setAccount(d.customer);
     setSettings({ name: d.customer.name || '', phone: d.customer.phone || '', address: d.customer.address || '' });
     loadOrders(d.token);
+    loadWishlist(d.token);
   }
 
   async function saveSettings() {
@@ -176,6 +189,7 @@ export default function Cuenta() {
         <h1>Hola, {account.name}</h1>
         <div className="tabs" style={{ marginTop: 14 }}>
           <button className={`tab-btn ${view === 'orders' ? 'active' : ''}`} onClick={() => setView('orders')}>Mis compras</button>
+          <button className={`tab-btn ${view === 'wishlist' ? 'active' : ''}`} onClick={() => setView('wishlist')}>Favoritos</button>
           <button className={`tab-btn ${view === 'settings' ? 'active' : ''}`} onClick={() => setView('settings')}>Configuración</button>
         </div>
       </div>
@@ -199,6 +213,28 @@ export default function Cuenta() {
                 </div>
               );
             })}
+          </>
+        )}
+
+        {view === 'wishlist' && (
+          <>
+            {wishlistItems.length === 0 && <p className="hint">Todavía no tienes cartas guardadas como favoritas — dale al corazón 🤍 en cualquier carta de la tienda para guardarla aquí.</p>}
+            <div className="grid">
+              {wishlistItems.map(it => (
+                <div className="card" key={it.id}>
+                  <div className="art">{it.img && <img src={it.img} alt={it.name} />}</div>
+                  <div className="info">
+                    <div className="name">{it.name}</div>
+                    <div className="set">{it.condition}{it.qty <= 0 ? ' · Agotado' : ''}</div>
+                    <div className="price mono">${Number(it.price).toFixed(2)} USD</div>
+                    <div className="row" style={{ display: 'flex', gap: 8 }}>
+                      <a href="/" style={{ flex: 1 }}><button className="ghost" style={{ width: '100%' }}>Ver en tienda</button></a>
+                      <button className="ghost" onClick={() => removeWishlist(it.id)}>Quitar</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </>
         )}
 

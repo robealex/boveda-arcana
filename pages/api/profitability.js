@@ -1,8 +1,8 @@
 import { prisma } from '../../lib/prisma';
-import { checkAdmin } from '../../lib/auth';
+import { checkOwner } from '../../lib/auth';
 
 export default async function handler(req, res) {
-  if (!checkAdmin(req)) return res.status(401).json({ error: 'Password de administrador incorrecto' });
+  if (!checkOwner(req)) return res.status(401).json({ error: 'Solo el dueño puede ver esta sección' });
 
   const items = await prisma.inventory.findMany({
     orderBy: { createdAt: 'desc' },
