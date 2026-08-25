@@ -189,7 +189,6 @@ export default function Admin() {
   function loadStaff() {
     fetch('/api/admin-users', { headers: { 'x-admin-password': pw } }).then(r => r.json()).then(d => setStaffUsers(d.users || []));
   }
-  useEffect(() => { if (authed && view === 'staff' && role === 'owner') loadStaff(); }, [authed, view, role]);
 
   async function saveStaff() {
     const url = staffForm.id ? `/api/admin-users?id=${staffForm.id}` : '/api/admin-users';
@@ -450,6 +449,7 @@ export default function Admin() {
 
   useEffect(() => { if (authed && view === 'orders') loadOrders(); }, [authed, view]);
   useEffect(() => { if (authed && view === 'users') loadCustomers(); }, [authed, view]);
+  useEffect(() => { if (authed && view === 'staff' && role === 'owner') loadStaff(); }, [authed, view, role]);
   useEffect(() => {
     if (authed && view === 'stats') {
       fetch('/api/stats', { headers: { 'x-admin-password': pw } }).then(r => r.json()).then(setStats);
