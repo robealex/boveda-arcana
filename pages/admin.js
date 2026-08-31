@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import ThemeToggle from '../components/ThemeToggle';
+import PasswordInput from '../components/PasswordInput';
 
 const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '';
 const ADMIN_TABS = [
@@ -958,7 +959,7 @@ export default function Admin() {
           <>
             <div className="field">
               <label>Contraseña</label>
-              <input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && tryLogin()} />
+              <PasswordInput value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && tryLogin()} />
             </div>
             <button className="primary" onClick={tryLogin}>Entrar</button>
           </>
@@ -969,7 +970,7 @@ export default function Admin() {
             <div className="field"><label>Correo</label><input value={staffEmail} onChange={e => setStaffEmail(e.target.value)} /></div>
             <div className="field">
               <label>Contraseña</label>
-              <input type="password" value={staffPw} onChange={e => setStaffPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && tryStaffLogin()} />
+              <PasswordInput value={staffPw} onChange={e => setStaffPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && tryStaffLogin()} />
             </div>
             {staffLoginError && <p className="hint" style={{ color: 'var(--blood)' }}>{staffLoginError}</p>}
             <button className="primary" onClick={tryStaffLogin}>Entrar</button>
@@ -1685,7 +1686,7 @@ export default function Admin() {
                 </div>
                 <div className="field">
                   <label>{staffForm.id ? 'Nueva contraseña (dejar vacío para no cambiarla)' : 'Contraseña'}</label>
-                  <input type="password" value={staffForm.password} onChange={e => setStaffForm(f => ({ ...f, password: e.target.value }))} />
+                  <PasswordInput value={staffForm.password} onChange={e => setStaffForm(f => ({ ...f, password: e.target.value }))} />
                 </div>
                 <div className="modal-actions">
                   <button className="ghost" onClick={() => setStaffForm(null)}>Cancelar</button>

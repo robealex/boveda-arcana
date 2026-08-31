@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import ThemeToggle from '../components/ThemeToggle';
+import PasswordInput from '../components/PasswordInput';
 
 export default function ResetPassword() {
   const [password, setPassword] = useState('');
@@ -36,8 +37,8 @@ export default function ResetPassword() {
           <p>Tu contraseña se actualizó. Ya puedes <a href="/cuenta" style={{ color: 'var(--gold)' }}>iniciar sesión</a>.</p>
         ) : (
           <>
-            <div className="field"><label>Nueva contraseña</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} /></div>
-            <div className="field"><label>Repite la contraseña</label><input type="password" value={password2} onChange={e => setPassword2(e.target.value)} /></div>
+            <div className="field"><label>Nueva contraseña</label><PasswordInput value={password} onChange={e => setPassword(e.target.value)} /></div>
+            <div className="field"><label>Repite la contraseña</label><PasswordInput value={password2} onChange={e => setPassword2(e.target.value)} /></div>
             {error && <p className="hint" style={{ color: 'var(--blood)' }}>{error}</p>}
             <button className="primary" style={{ width: '100%' }} onClick={submit}>Guardar nueva contraseña</button>
           </>

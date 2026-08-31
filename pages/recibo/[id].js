@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import ThemeToggle from '../../components/ThemeToggle';
+import PasswordInput from '../../components/PasswordInput';
 
 const SHOP_OWNER = process.env.NEXT_PUBLIC_SHOP_OWNER || 'Bóveda Arcana';
 const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '';
@@ -34,7 +35,7 @@ export default function Recibo() {
   if (!authed) {
     return (
       <main style={{ maxWidth: 340, marginTop: 100 }}>
-        <div className="field"><label>Contraseña de administrador</label><input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && tryLogin()} /></div>
+        <div className="field"><label>Contraseña de administrador</label><PasswordInput value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && tryLogin()} /></div>
         <button className="primary" onClick={tryLogin}>Entrar</button>
       </main>
     );

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Header from '../components/Header';
+import PasswordInput from '../components/PasswordInput';
 import { saveToken, getToken, clearToken } from '../lib/clientAuth';
 
 export default function Cuenta() {
@@ -148,7 +149,7 @@ export default function Cuenta() {
           {mode === 'signup' && (
             <div className="field"><label>Teléfono (opcional)</label><input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
           )}
-          <div className="field"><label>Contraseña</label><input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
+          <div className="field"><label>Contraseña</label><PasswordInput value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} style={{ width: 'auto' }} id="remember" />
@@ -250,9 +251,9 @@ export default function Cuenta() {
             <hr style={{ border: 'none', borderTop: '1px solid var(--line)', margin: '28px 0 20px' }} />
 
             <h3>Cambiar contraseña</h3>
-            <div className="field"><label>Contraseña actual</label><input type="password" value={pwForm.currentPassword} onChange={e => setPwForm(f => ({ ...f, currentPassword: e.target.value }))} /></div>
-            <div className="field"><label>Nueva contraseña</label><input type="password" value={pwForm.newPassword} onChange={e => setPwForm(f => ({ ...f, newPassword: e.target.value }))} /></div>
-            <div className="field"><label>Repite la nueva contraseña</label><input type="password" value={pwForm.newPassword2} onChange={e => setPwForm(f => ({ ...f, newPassword2: e.target.value }))} /></div>
+            <div className="field"><label>Contraseña actual</label><PasswordInput value={pwForm.currentPassword} onChange={e => setPwForm(f => ({ ...f, currentPassword: e.target.value }))} /></div>
+            <div className="field"><label>Nueva contraseña</label><PasswordInput value={pwForm.newPassword} onChange={e => setPwForm(f => ({ ...f, newPassword: e.target.value }))} /></div>
+            <div className="field"><label>Repite la nueva contraseña</label><PasswordInput value={pwForm.newPassword2} onChange={e => setPwForm(f => ({ ...f, newPassword2: e.target.value }))} /></div>
             {pwMsg && <p className="hint" style={{ color: pwMsg === 'Contraseña actualizada.' ? 'var(--teal)' : 'var(--blood)' }}>{pwMsg}</p>}
             <button className="ghost" onClick={changePassword}>Cambiar contraseña</button>
           </>
