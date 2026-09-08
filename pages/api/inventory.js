@@ -13,7 +13,7 @@ function serialize(item, reservedMap, isAdmin) {
     reserved,
     qty: Math.max(0, item.qty - reserved)
   };
-  if (!isAdmin) { delete out.notes; delete out.costUsd; }
+  if (!isAdmin) { delete out.notes; delete out.costUsd; delete out.location; }
   return out;
 }
 
@@ -27,7 +27,7 @@ async function getReservedMap() {
 }
 
 function buildData(body) {
-  const { name, set_name, img, price, original_price, qty, condition, stripe_link, colors, rarity, type_line, foil, language, scryfall_uri, notes, cost_usd } = body;
+  const { name, set_name, img, price, original_price, qty, condition, stripe_link, colors, rarity, type_line, foil, language, scryfall_uri, notes, cost_usd, location } = body;
   const data = {};
   if (name !== undefined) data.name = name;
   if (set_name !== undefined) data.setName = set_name || '';
@@ -44,6 +44,7 @@ function buildData(body) {
   if (foil !== undefined) data.foil = Boolean(foil);
   if (language !== undefined) data.language = language || 'en';
   if (scryfall_uri !== undefined) data.scryfallUri = scryfall_uri || '';
+  if (location !== undefined) data.location = location || '';
   if (notes !== undefined) data.notes = notes || '';
   return data;
 }

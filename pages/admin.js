@@ -23,6 +23,7 @@ export default function Admin() {
   const [rate, setRate] = useState(null);
   const [liveRate, setLiveRate] = useState(null);
   const [sortBy, setSortBy] = useState('newest');
+  const [locationFilter, setLocationFilter] = useState('');
 
   // ---------- Búsqueda avanzada ----------
   const [showExact, setShowExact] = useState(false);
@@ -63,18 +64,22 @@ export default function Admin() {
   const totalResultPages = Math.max(1, Math.ceil(results.length / RESULTS_PER_PAGE));
   const pagedResults = results.slice(resultsPage * RESULTS_PER_PAGE, resultsPage * RESULTS_PER_PAGE + RESULTS_PER_PAGE);
 
-  const sortedItems = [...items].sort((a, b) => {
-    if (sortBy === 'name') return a.name.localeCompare(b.name);
-    if (sortBy === 'price_asc') return Number(a.price) - Number(b.price);
-    if (sortBy === 'price_desc') return Number(b.price) - Number(a.price);
-    return new Date(b.createdAt) - new Date(a.createdAt);
-  });
+  const knownLocations = [...new Set(items.map(it => it.location).filter(Boolean))].sort();
+
+  const sortedItems = [...items]
+    .filter(it => !locationFilter || it.location === locationFilter)
+    .sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      if (sortBy === 'price_asc') return Number(a.price) - Number(b.price);
+      if (sortBy === 'price_desc') return Number(b.price) - Number(a.price);
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
 
   const INV_PAGE_SIZE = 20;
   const [invPage, setInvPage] = useState(0);
   const totalInvPages = Math.max(1, Math.ceil(sortedItems.length / INV_PAGE_SIZE));
   const pagedItems = sortedItems.slice(invPage * INV_PAGE_SIZE, invPage * INV_PAGE_SIZE + INV_PAGE_SIZE);
-  useEffect(() => { setInvPage(0); }, [sortBy, items.length]);
+  useEffect(() => { setInvPage(0); }, [sortBy, locationFilter, items.length]);
 
   // ---------- Vista de tabla editable ----------
   const [invView, setInvView] = useState('cards');
@@ -335,7 +340,7 @@ export default function Admin() {
       colors: (card.colors || '').split(',').filter(Boolean),
       rarity: card.rarity || '', type_line: card.type_line || '',
       foil: Boolean(card.foil), language: card.lang || 'en',
-      stripe_link: '', scryfall_uri: card.scryfall_uri || '', notes: '',
+      stripe_link: '', scryfall_uri: card.scryfall_uri || '', notes: '', location: '',
       ref_usd: card.usd || null
     });
   }
@@ -357,7 +362,7 @@ export default function Admin() {
       rarity: it.rarity || '', type_line: it.typeLine || '',
       foil: Boolean(it.foil), language: it.language || 'en',
       stripe_link: it.stripeLink || '', scryfall_uri: it.scryfallUri || '',
-      notes: it.notes || '', ref_usd: impliedRefUsd(it)
+      notes: it.notes || '', location: it.location || '', ref_usd: impliedRefUsd(it)
     });
   }
 
@@ -372,7 +377,7 @@ export default function Admin() {
       rarity: it.rarity || '', type_line: it.typeLine || '',
       foil: Boolean(it.foil), language: it.language || 'en',
       stripe_link: it.stripeLink || '', scryfall_uri: it.scryfallUri || '',
-      notes: '', ref_usd: impliedRefUsd(it)
+      notes: '', location: it.location || '', ref_usd: impliedRefUsd(it)
     });
   }
 
@@ -414,7 +419,7 @@ export default function Admin() {
       qty: parseInt(m.qty), condition: m.condition,
       colors: m.colors.join(','), rarity: m.rarity, type_line: m.type_line,
       foil: m.foil, language: m.language, stripe_link: m.stripe_link, scryfall_uri: m.scryfall_uri,
-      notes: m.notes, ref_usd: m.ref_usd
+      notes: m.notes, location: m.location, ref_usd: m.ref_usd
     };
     const url = m.mode === 'edit' ? `/api/inventory?id=${m.id}` : '/api/inventory';
     const method = m.mode === 'edit' ? 'PATCH' : 'POST';
@@ -1237,6 +1242,12 @@ export default function Admin() {
             <option value="price_asc">Precio: menor a mayor</option>
             <option value="price_desc">Precio: mayor a menor</option>
           </select>
+          {knownLocations.length > 0 && (
+            <select value={locationFilter} onChange={e => setLocationFilter(e.target.value)} style={{ width: 180 }}>
+              <option value="">📍 Todas las ubicaciones</option>
+              {knownLocations.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+            </select>
+          )}
           <div className="view-toggle">
             <button className={invView === 'cards' ? 'active' : ''} onClick={() => setInvView('cards')}>🎴 Tarjetas</button>
             <button className={invView === 'table' ? 'active' : ''} onClick={() => setInvView('table')}>📋 Tabla</button>
@@ -1261,6 +1272,7 @@ export default function Admin() {
                 {it.condition} · x{it.rawQty}{it.reserved > 0 ? ` (${it.reserved} apartadas, ${it.qty} libres)` : ''} · {LANGUAGES[it.language] || it.language}
                 {it.views > 0 && <span> · 👁 {it.views}</span>}
               </div>
+              {it.location && <div className="hint" style={{ marginTop: -4 }}>📍 {it.location}</div>}
               <div className="price mono">${Number(it.price).toFixed(2)} USD{rate ? ` · ≈$${(Number(it.price) * rate).toFixed(2)} MXN` : ''}</div>
               {it.originalPrice && <div className="hint" style={{ marginTop: -4, textDecoration: 'line-through' }}>antes ${Number(it.originalPrice).toFixed(2)} USD</div>}
               <div className="row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -2012,6 +2024,10 @@ export default function Admin() {
             <div className="field" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" id="foilCheck" checked={modalItem.foil} onChange={e => setModalItem(m => ({ ...m, foil: e.target.checked }))} style={{ width: 'auto' }} />
               <label htmlFor="foilCheck" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}><span className="foil-badge" /> Es versión Foil</label>
+            </div>
+
+            <div className="field"><label>Ubicación física (ej. Caja 1, Carpeta 3, Mueble A)</label>
+              <input value={modalItem.location} onChange={e => setModalItem(m => ({ ...m, location: e.target.value }))} placeholder="ej. Caja 1" />
             </div>
 
             <div className="field"><label>Notas internas (solo tú las ves)</label>

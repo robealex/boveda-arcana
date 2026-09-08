@@ -109,6 +109,7 @@ model Inventory {
   foil          Boolean  @default(false)
   language      String   @default("en")
   scryfallUri   String?  @map("scryfall_uri")
+  location      String?
   costUsd       Decimal? @map("cost_usd")
   notes         String?
   views         Int      @default(0)
