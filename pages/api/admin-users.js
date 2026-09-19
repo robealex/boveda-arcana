@@ -1,6 +1,7 @@
 import { prisma } from '../../lib/prisma';
 import { checkOwner } from '../../lib/auth';
 import { hashPassword } from '../../lib/customerAuth';
+import { sendStaffWelcomeEmail } from '../../lib/sendEmail';
 
 export default async function handler(req, res) {
   if (!checkOwner(req)) return res.status(401).json({ error: 'Solo el dueño puede administrar el staff' });
@@ -22,6 +23,8 @@ export default async function handler(req, res) {
     const user = await prisma.adminUser.create({
       data: { name, email: email.toLowerCase().trim(), passwordHash, role: role === 'owner' ? 'owner' : 'staff' }
     });
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || `https://${req.headers.host}`;
+    sendStaffWelcomeEmail(user, password, siteUrl).catch(() => {});
     return res.status(201).json({ user: { id: user.id, name: user.name, email: user.email, role: user.role, active: user.active } });
   }
 

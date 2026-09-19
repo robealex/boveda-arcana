@@ -125,3 +125,9 @@ Registro de todo lo construido hasta esta versión.
 - Aviso de "poco stock" (⚠) visible solo para ti en el inventario del admin, cuando quedan 1 o 2 disponibles.
 - Lista de deseos (favoritos): corazón en cada carta para clientes con cuenta, con su propia sección "Favoritos" en Mi cuenta.
 - Se quitó el título redundante "Panel de administrador" ya que el encabezado ya dice "· ADMIN".
+
+## Contraseñas visibles, ubicación física y correos de bienvenida
+- Botón de mostrar/ocultar (👁️/🙈) en todos los campos de contraseña del sitio.
+- Ubicación física por carta (ej. "Caja 1", "Carpeta 3") con filtro dedicado en el inventario del admin, para saber dónde tienes guardada cada una.
+- Correo de bienvenida automático al crear una cuenta de cliente.
+- Correo de bienvenida con credenciales (correo, contraseña, rol) al dar de alta un nuevo usuario de staff.

@@ -1,5 +1,6 @@
 import { prisma } from '../../../lib/prisma';
 import { hashPassword, signToken } from '../../../lib/customerAuth';
+import { sendCustomerWelcomeEmail } from '../../../lib/sendEmail';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
@@ -14,6 +15,9 @@ export default async function handler(req, res) {
   const customer = await prisma.customer.create({
     data: { name: name.trim(), email: email.toLowerCase().trim(), phone: phone || null, passwordHash }
   });
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || `https://${req.headers.host}`;
+  sendCustomerWelcomeEmail(customer, siteUrl).catch(() => {});
 
   const token = signToken(customer.id);
   res.status(201).json({ token, customer: { id: customer.id, name: customer.name, email: customer.email, phone: customer.phone, address: customer.address } });
