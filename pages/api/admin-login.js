@@ -28,6 +28,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Correo o contraseña incorrectos' });
   }
 
-  const token = signAdminToken(user.id, user.role);
-  res.status(200).json({ token, name: user.name, role: user.role });
+  const permissions = (user.permissions || '').split(',').filter(Boolean);
+  const token = signAdminToken(user.id, user.role, permissions);
+  res.status(200).json({ token, name: user.name, role: user.role, permissions });
 }

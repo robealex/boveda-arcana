@@ -62,6 +62,7 @@ model AdminUser {
   email          String   @unique
   passwordHash   String   @map("password_hash")
   role           String   @default("staff") // owner | staff
+  permissions    String   @default("") // lista separada por comas: inv_edit,inv_delete,inv_wipe,inv_export,orders,decks,users,stats,profit,pricing
   active         Boolean  @default(true)
   failedAttempts Int      @default(0) @map("failed_attempts")
   lockedUntil    DateTime? @map("locked_until")
