@@ -829,6 +829,7 @@ export default function AdminTest() {
   function parseCSV(text) {
     const rows = [];
     let i = 0, field = '', row = [], inQuotes = false;
+    text = String(text || '').replace(/^\\uFEFF/, '');
     while (i < text.length) {
       const char = text[i];
       if (inQuotes) {
@@ -850,17 +851,21 @@ export default function AdminTest() {
   }
 
   function parseImportRows(rows) {
-    const header = rows[0]?.map(c => c.trim().toLowerCase()) || [];
-    const nameIdx = header.findIndex(h => ['name', 'nombre', 'carta', 'card'].includes(h));
-    const qtyIdx = header.findIndex(h => ['qty', 'cantidad', 'cant'].includes(h));
-    const condIdx = header.findIndex(h => ['condition', 'condicion', 'condición', 'estado'].includes(h));
+    const normalize = value => String(value || '').replace(/^\\uFEFF/, '').trim().toLowerCase().replace(/[ _-]/g, '');
+    const header = rows[0]?.map(normalize) || [];
+    const nameIdx = header.findIndex(h => ['name', 'nombre', 'carta', 'card', 'cardname', 'nombrecarta'].includes(h));
+    const qtyIdx = header.findIndex(h => ['qty', 'quantity', 'cantidad', 'cant', 'count'].includes(h));
+    const condIdx = header.findIndex(h => ['condition', 'condicion', 'estado', 'cardcondition'].includes(h));
     const dataRows = nameIdx !== -1 ? rows.slice(1) : rows;
-    return dataRows.map(r => ({
-      name: (nameIdx !== -1 ? r[nameIdx] : r[0]) || '',
-      qty: (qtyIdx !== -1 && r[qtyIdx] && parseInt(r[qtyIdx])) || 1,
-      condition: (condIdx !== -1 && r[condIdx]?.trim()) || 'Near Mint',
-      status: 'pending', data: null, price: '', include: true
-    })).map(r => ({ ...r, name: r.name.trim() })).filter(r => r.name);
+    return dataRows.map(r => {
+      const rawQty = qtyIdx !== -1 ? parseInt(r[qtyIdx], 10) : 1;
+      return {
+        name: (nameIdx !== -1 ? r[nameIdx] : r[0]) || '',
+        qty: Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 1,
+        condition: (condIdx !== -1 && r[condIdx]?.trim()) || 'Near Mint',
+        status: 'pending', data: null, price: '', include: true
+      };
+    }).map(r => ({ ...r, name: String(r.name).trim() })).filter(r => r.name);
   }
 
   function handleCsvFile(e) {
@@ -900,9 +905,10 @@ export default function AdminTest() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cards: names })
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Error al consultar Scryfall.');
-    return new Map((data.data || []).map(card => [card.name.toLowerCase(), card]));
+    let data;
+    try { data = await response.json(); } catch { throw new Error('El servidor devolvió una respuesta inválida al consultar las cartas.'); }
+    if (!response.ok) throw new Error(data.error || `Error al consultar Scryfall (HTTP ${response.status}).`);
+    return new Map((data.data || []).map(card => [(card.requested_name || card.name).toLowerCase(), card]));
   }
 
   async function runImportLookups(rowsToProcess) {
