@@ -1076,7 +1076,8 @@ export default function AdminTest() {
           name: r.data.name, set_name: r.data.set_name, img: r.data.img,
           price: parseFloat(r.price), qty: r.qty, condition: r.condition,
           colors: r.data.colors, rarity: r.data.rarity, type_line: r.data.type_line,
-          foil: r.data.foil, language: r.data.lang, scryfall_uri: r.data.scryfall_uri
+          foil: r.data.foil, language: r.data.lang, scryfall_uri: r.data.scryfall_uri,
+          collector_number: r.data.collector_number
         })
       });
     }
