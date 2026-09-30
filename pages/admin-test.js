@@ -1131,6 +1131,17 @@ export default function AdminTest() {
                       {r.status === 'notfound' && <span style={{ color: 'var(--blood)', fontSize: '0.8rem' }}>no encontrada</span>}
                       {r.status === 'found' && <span className="hint">{r.data.set_name}</span>}
                     </div>
+                    {r.status === 'found' && (
+                      <div style={{ marginTop: 6, fontSize: '0.8rem', color: 'var(--muted)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        <span>Rareza: {r.data.rarity || 'Sin dato'}</span>
+                        <span>Idioma: {(r.data.lang || 'en').toUpperCase()}</span>
+                        <span>Tipo: {r.data.type_line || 'Sin dato'}</span>
+                        <span>Colores: {r.data.colors || 'Incoloro'}</span>
+                        <span>Foil: {r.data.foil ? 'Sí' : 'No'}</span>
+                        {r.data.cmc !== null && r.data.cmc !== undefined && <span>CMC: {r.data.cmc}</span>}
+                        {r.data.scryfall_uri && <a href={r.data.scryfall_uri} target="_blank" rel="noreferrer">Ver en Scryfall</a>}
+                      </div>
+                    )}
 
                     {r.status === 'notfound' && (
                       <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
