@@ -348,10 +348,11 @@ export default function AdminTest() {
   // Abre el editor completo para una carta que todavía está en la importación CSV.
   // Los cambios quedan solamente en la fila de importación; NO se guardan en inventario
   // hasta que el usuario pulse "Agregar seleccionadas".
-  function openCsvEditModal(row, index) {
+  async function openCsvEditModal(row, index) {
     const d = row.data || {};
     setModalItem({
-      mode: 'csv-edit', csvIndex: index,
+      mode: 'csv-edit', csvIndex: index, printings: [], loadingPrintings: true,
+      selectedPrinting: d.set ? `${d.set}:${d.collector_number || ''}` : '',
       name: d.name || row.name, set_name: d.set_name || '', img: d.img || '',
       price: row.price !== '' ? row.price : (d.usd || ''), original_price: '', cost_usd: '',
       qty: row.qty || 1, condition: row.condition || 'Near Mint',
@@ -360,6 +361,42 @@ export default function AdminTest() {
       foil: Boolean(d.foil), language: d.lang || 'en',
       stripe_link: '', scryfall_uri: d.scryfall_uri || '', notes: '', location: '',
       ref_usd: d.usd || null
+    });
+    try {
+      const response = await fetch('/api/card-printings?name=' + encodeURIComponent(d.name || row.name));
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'No se pudieron cargar las ediciones.');
+      setModalItem(m => m?.mode === 'csv-edit' && m.csvIndex === index
+        ? { ...m, printings: result.printings || [], loadingPrintings: false }
+        : m);
+    } catch (error) {
+      setModalItem(m => m?.mode === 'csv-edit' && m.csvIndex === index
+        ? { ...m, printings: [], loadingPrintings: false, printingsError: error.message }
+        : m);
+    }
+  }
+
+  function selectCsvPrinting(printing) {
+    setModalItem(m => {
+      if (!m || m.mode !== 'csv-edit') return m;
+      const ref = printing.prices?.usd || printing.prices?.usd_foil || null;
+      const price = ref ? (parseFloat(ref) * pctFor(m.condition) / 100).toFixed(2) : '';
+      return {
+        ...m,
+        selectedPrinting: `${printing.set}:${printing.collector_number}`,
+        set_name: printing.set_name,
+        img: printing.img,
+        price,
+        ref_usd: ref,
+        rarity: printing.rarity,
+        type_line: printing.type_line,
+        language: printing.lang,
+        colors: printing.colors ? printing.colors.split(',').filter(Boolean) : [],
+        foil: Boolean(printing.foil),
+        scryfall_uri: printing.scryfall_uri,
+        printing_set: printing.set,
+        collector_number: printing.collector_number
+      };
     });
   }
 
@@ -458,7 +495,9 @@ export default function AdminTest() {
           colors: m.colors.join(','),
           foil: m.foil,
           scryfall_uri: m.scryfall_uri,
-          usd: m.ref_usd || row.data?.usd || null
+          usd: m.ref_usd || null,
+          set: m.printing_set || row.data?.set || '',
+          collector_number: m.collector_number || row.data?.collector_number || ''
         }
       }) : row));
       setModalItem(null);
@@ -2047,6 +2086,25 @@ export default function AdminTest() {
 
             <div className="field"><label>Nombre</label><input value={modalItem.name} onChange={e => setModalItem(m => ({ ...m, name: e.target.value }))} /></div>
             <div className="field"><label>Edición / set</label><input value={modalItem.set_name} onChange={e => setModalItem(m => ({ ...m, set_name: e.target.value }))} /></div>
+            {modalItem.mode === 'csv-edit' && (
+              <div className="field">
+                <label>Seleccionar impresión / edición de Scryfall</label>
+                <select value={modalItem.selectedPrinting || ''} disabled={modalItem.loadingPrintings || !modalItem.printings?.length}
+                  onChange={e => {
+                    const printing = modalItem.printings.find(p => `${p.set}:${p.collector_number}` === e.target.value);
+                    if (printing) selectCsvPrinting(printing);
+                  }}>
+                  <option value="">{modalItem.loadingPrintings ? 'Cargando ediciones...' : 'Selecciona una edición'}</option>
+                  {(modalItem.printings || []).map(p => (
+                    <option key={`${p.set}:${p.collector_number}`} value={`${p.set}:${p.collector_number}`}>
+                      {p.set_name} ({p.set.toUpperCase()}) · #{p.collector_number} · {p.lang.toUpperCase()}{p.foil ? ' · Foil' : ''}
+                    </option>
+                  ))}
+                </select>
+                {modalItem.printingsError && <p className="hint">{modalItem.printingsError}</p>}
+                <p className="hint">Al elegir una edición se actualizan automáticamente la imagen, el precio de referencia, el precio de venta, el número de colección, el idioma, la rareza y los demás datos disponibles.</p>
+              </div>
+            )}
             <div className="field"><label>URL de imagen</label><input value={modalItem.img} onChange={e => setModalItem(m => ({ ...m, img: e.target.value }))} /></div>
 
             <div style={{ display: 'flex', gap: 10 }}>
