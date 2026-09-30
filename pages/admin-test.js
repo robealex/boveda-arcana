@@ -872,8 +872,9 @@ export default function AdminTest() {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
+    reader.onerror = () => alert('No se pudo leer el archivo CSV.');
     reader.onload = () => {
-      const rows = parseCSV(String(reader.result));
+      const rows = parseCSV(String(reader.result || ''));
       if (rows.length === 0) { alert('El CSV está vacío.'); return; }
       const parsed = parseImportRows(rows);
       if (parsed.length === 0) { alert('No se encontraron nombres de cartas en el archivo.'); return; }
@@ -885,15 +886,18 @@ export default function AdminTest() {
   }
 
   function processCsvPaste() {
-    const lines = csvPasteText.split(/\\r?\\n/).map(line => line.trim()).filter(Boolean);
-    const parsed = lines.map(line => {
+    const lines = csvPasteText.replace(/\\r\\n?/g, '\\n').split('\\n').map(line => line.trim()).filter(Boolean);
+    const parsed = lines.flatMap(line => {
+      // Admite "2 Sol Ring", "2x Sol Ring" y nombres simples por línea.
       const match = line.match(/^(\\d+)x?\\s+(.+)$/i);
-      return {
-        name: match ? match[2].trim() : line,
+      const name = (match ? match[2] : line).trim();
+      if (!name) return [];
+      return [{
+        name,
         qty: match ? Math.max(1, parseInt(match[1], 10)) : 1,
         condition: 'Near Mint', status: 'pending', data: null, price: '', include: true
-      };
-    }).filter(row => row.name);
+      }];
+    });
     if (!parsed.length) { alert('Pega al menos una carta, una por línea.'); return; }
     setCsvRows(parsed);
     runImportLookups(parsed);
