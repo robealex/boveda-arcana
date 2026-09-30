@@ -345,6 +345,24 @@ export default function AdminTest() {
     });
   }
 
+  // Abre el editor completo para una carta que todavía está en la importación CSV.
+  // Los cambios quedan solamente en la fila de importación; NO se guardan en inventario
+  // hasta que el usuario pulse "Agregar seleccionadas".
+  function openCsvEditModal(row, index) {
+    const d = row.data || {};
+    setModalItem({
+      mode: 'csv-edit', csvIndex: index,
+      name: d.name || row.name, set_name: d.set_name || '', img: d.img || '',
+      price: row.price !== '' ? row.price : (d.usd || ''), original_price: '', cost_usd: '',
+      qty: row.qty || 1, condition: row.condition || 'Near Mint',
+      colors: (d.colors || '').split(',').filter(Boolean),
+      rarity: d.rarity || '', type_line: d.type_line || '',
+      foil: Boolean(d.foil), language: d.lang || 'en',
+      stripe_link: '', scryfall_uri: d.scryfall_uri || '', notes: '', location: '',
+      ref_usd: d.usd || null
+    });
+  }
+
   function impliedRefUsd(it) {
     const pct = pctFor(it.condition || 'Near Mint');
     if (!pct || pct <= 0) return Number(it.price);
@@ -421,6 +439,33 @@ export default function AdminTest() {
       foil: m.foil, language: m.language, stripe_link: m.stripe_link, scryfall_uri: m.scryfall_uri,
       notes: m.notes, location: m.location, ref_usd: m.ref_usd
     };
+    // En modo CSV el editor modifica solamente la fila de importación.
+    if (m.mode === 'csv-edit') {
+      setCsvRows(prev => prev.map((row, i) => i === m.csvIndex ? ({
+        ...row,
+        name: m.name.trim(),
+        qty: parseInt(m.qty),
+        condition: m.condition,
+        price: parseFloat(m.price).toFixed(2),
+        data: {
+          ...(row.data || {}),
+          name: m.name.trim(),
+          set_name: m.set_name,
+          img: m.img,
+          rarity: m.rarity,
+          type_line: m.type_line,
+          lang: m.language,
+          colors: m.colors.join(','),
+          foil: m.foil,
+          scryfall_uri: m.scryfall_uri,
+          usd: m.ref_usd || row.data?.usd || null
+        }
+      }) : row));
+      setModalItem(null);
+      setPriceHistory(null);
+      return;
+    }
+
     const url = m.mode === 'edit' ? `/api/inventory?id=${m.id}` : '/api/inventory';
     const method = m.mode === 'edit' ? 'PATCH' : 'POST';
     const r = await fetch(url, {
@@ -1175,6 +1220,9 @@ export default function AdminTest() {
                           <option>Near Mint</option><option>Lightly Played</option><option>Moderately Played</option><option>Heavily Played</option><option>Damaged</option>
                         </select>
                         {r.data.usd && <span className="hint">(ref. Scryfall: ${r.data.usd} USD)</span>}
+                        <button className="ghost" onClick={() => openCsvEditModal(r, i)} style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
+                          Editar detalles
+                        </button>
                       </div>
                     )}
                   </div>
