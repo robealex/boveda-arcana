@@ -1014,7 +1014,7 @@ export default function AdminTest() {
         const card = found.get(row.name.toLowerCase());
         if (!card) return { ...row, status: 'notfound' };
         return {
-          ...row, status: 'found', data: card,
+          ...row, status: 'found', data: card, printings: [], printingsLoading: false,
           price: card.usd ? (parseFloat(card.usd) * pctFor(row.condition) / 100).toFixed(2) : ''
         };
       }));
@@ -1049,6 +1049,45 @@ export default function AdminTest() {
     } finally {
       setImporting(false);
     }
+  }
+
+  async function loadCsvRowPrintings(i, row) {
+    if (!row?.data?.name) return;
+    updateCsvRow(i, { printingsLoading: true });
+    try {
+      const response = await fetch('/api/card-printings?name=' + encodeURIComponent(row.data.name));
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'No se pudieron cargar las ediciones.');
+      updateCsvRow(i, { printings: result.printings || [], printingsLoading: false });
+    } catch (error) {
+      updateCsvRow(i, { printings: [], printingsLoading: false, printingsError: error.message });
+    }
+  }
+
+  function selectCsvRowPrinting(i, printing) {
+    setCsvRows(prev => prev.map((row, idx) => {
+      if (idx !== i) return row;
+      const ref = printing.prices?.usd || printing.prices?.usd_foil || null;
+      const price = ref ? (parseFloat(ref) * pctFor(row.condition) / 100).toFixed(2) : '';
+      return {
+        ...row,
+        data: {
+          ...row.data,
+          set: printing.set,
+          set_name: printing.set_name,
+          collector_number: printing.collector_number,
+          img: printing.img,
+          usd: ref,
+          rarity: printing.rarity,
+          type_line: printing.type_line,
+          lang: printing.lang,
+          colors: printing.colors,
+          foil: Boolean(printing.foil),
+          scryfall_uri: printing.scryfall_uri
+        },
+        price
+      };
+    }));
   }
 
   function updateCsvRow(i, patch) {
@@ -1224,7 +1263,12 @@ export default function AdminTest() {
                       <strong style={{ fontSize: '0.9rem' }}>{r.data?.name || r.name}</strong>
                       {r.status === 'loading' && <span className="hint">buscando...</span>}
                       {r.status === 'notfound' && <span style={{ color: 'var(--blood)', fontSize: '0.8rem' }}>no encontrada</span>}
-                      {r.status === 'found' && <span className="hint">{r.data.set_name}</span>}
+                      {r.status === 'found' && (
+                        <>
+                          <span className="hint">{r.data.set_name}</span>
+                          <span className="hint">#{r.data.collector_number || '—'}</span>
+                        </>
+                      )}
                     </div>
                     {r.status === 'found' && (
                       <div style={{ marginTop: 6, fontSize: '0.8rem', color: 'var(--muted)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -1247,6 +1291,29 @@ export default function AdminTest() {
 
                     {r.status === 'found' && (
                       <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span className="hint">Edición:</span>
+                        <select
+                          value={r.data?.set && r.data?.collector_number ? `${r.data.set}:${r.data.collector_number}` : ''}
+                          disabled={r.printingsLoading}
+                          onFocus={() => {
+                            if (!r.printings?.length && !r.printingsLoading) loadCsvRowPrintings(i, r);
+                          }}
+                          onChange={e => {
+                            const p = (r.printings || []).find(x => `${x.set}:${x.collector_number}` === e.target.value);
+                            if (p) selectCsvRowPrinting(i, p);
+                          }}
+                          style={{ minWidth: 230 }}
+                        >
+                          <option value="">{r.printingsLoading ? 'Cargando ediciones...' : 'Cargar ediciones'}</option>
+                          {(r.printings || []).map(p => (
+                            <option key={`${p.set}:${p.collector_number}`} value={`${p.set}:${p.collector_number}`}>
+                              {p.set_name} ({p.set.toUpperCase()}) · #{p.collector_number} · {p.lang.toUpperCase()}{p.foil ? ' · Foil' : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <button className="ghost" onClick={() => loadCsvRowPrintings(i, r)} disabled={r.printingsLoading} style={{ padding: '4px 10px', fontSize: '0.75rem' }}>
+                          {r.printingsLoading ? 'Cargando...' : 'Ediciones'}
+                        </button>
                         <span className="hint">Precio USD:</span>
                         <input type="number" value={r.price} onChange={e => updateCsvRow(i, { price: e.target.value })} style={{ width: 90 }} />
                         <span className="hint">Cant.:</span>
