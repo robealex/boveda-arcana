@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   const not_found = [];
 
   try {
-    // Scryfall Collection acepta hasta 75 identificadores por solicitud.
+    // La colección exacta es eficiente; después se intenta fuzzy para los nombres no encontrados.
     for (let i = 0; i < names.length; i += 75) {
       const batch = names.slice(i, i + 75);
       const response = await fetch('https://api.scryfall.com/cards/collection', {
@@ -29,36 +29,60 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({ identifiers: batch.map(name => ({ name })) })
       });
-
-      const payload = await response.json();
+      let payload;
+      try { payload = await response.json(); } catch { throw new Error('Respuesta inválida de Scryfall.'); }
       if (!response.ok) {
-        return res.status(response.status).json({
-          error: payload.details || payload.error || 'Scryfall no pudo procesar la consulta.'
+        return res.status(502).json({
+          error: payload.details || payload.error || `Scryfall respondió con HTTP ${response.status}.`
         });
       }
 
-      for (const card of payload.data || []) {
-        data.push({
-          name: card.name,
-          set_name: card.set_name,
-          img: card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || '',
-          usd: card.prices?.usd || card.prices?.usd_foil || null,
-          colors: (card.colors || card.card_faces?.[0]?.colors || []).join(','),
-          rarity: card.rarity || '',
-          type_line: card.type_line || card.card_faces?.[0]?.type_line || '',
-          foil: Boolean(card.foil),
-          lang: card.lang || 'en',
-          scryfall_uri: card.scryfall_uri || '',
-          cmc: typeof card.cmc === 'number' ? card.cmc : null
-        });
-      }
-      for (const missing of payload.not_found || []) {
-        if (missing.name) not_found.push(missing.name);
+      const exact = new Map((payload.data || []).map(card => [card.name.toLowerCase(), card]));
+      for (const requested of batch) {
+        const card = exact.get(requested.toLowerCase());
+        if (card) data.push({ ...formatCard(card), requested_name: requested });
+        else not_found.push(requested);
       }
     }
 
+    // Resuelve nombres aproximados con concurrencia limitada para no saturar Scryfall.
+    const unresolved = [...not_found];
+    not_found.length = 0;
+    for (let i = 0; i < unresolved.length; i += 5) {
+      const group = unresolved.slice(i, i + 5);
+      const results = await Promise.all(group.map(async requested => {
+        try {
+          const response = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(requested)}`, {
+            headers: { 'User-Agent': 'BovedaArcana/1.0', Accept: 'application/json' }
+          });
+          if (!response.ok) return { requested, card: null };
+          return { requested, card: await response.json() };
+        } catch { return { requested, card: null }; }
+      }));
+      for (const result of results) {
+        if (result.card && result.card.object !== 'error') {
+          data.push({ ...formatCard(result.card), requested_name: result.requested });
+        } else not_found.push(result.requested);
+      }
+    }
     return res.status(200).json({ data, not_found });
   } catch (error) {
-    return res.status(502).json({ error: 'Error al conectar con Scryfall.' });
+    return res.status(502).json({ error: error.message || 'Error al conectar con Scryfall.' });
   }
+}
+
+function formatCard(card) {
+  return {
+    name: card.name,
+    set_name: card.set_name,
+    img: card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || '',
+    usd: card.prices?.usd || card.prices?.usd_foil || null,
+    colors: (card.colors || card.card_faces?.[0]?.colors || []).join(','),
+    rarity: card.rarity || '',
+    type_line: card.type_line || card.card_faces?.[0]?.type_line || '',
+    foil: Boolean(card.foil),
+    lang: card.lang || 'en',
+    scryfall_uri: card.scryfall_uri || '',
+    cmc: typeof card.cmc === 'number' ? card.cmc : null
+  };
 }
