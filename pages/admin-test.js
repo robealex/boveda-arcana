@@ -886,10 +886,10 @@ export default function AdminTest() {
   }
 
   function processCsvPaste() {
-    const lines = csvPasteText.replace(/\\r\\n?/g, '\\n').split('\\n').map(line => line.trim()).filter(Boolean);
+    const lines = csvPasteText.replace(/\r\n?/g, '\n').split('\n').map(line => line.trim()).filter(Boolean);
     const parsed = lines.flatMap(line => {
       // Admite "2 Sol Ring", "2x Sol Ring" y nombres simples por línea.
-      const match = line.match(/^(\\d+)x?\\s+(.+)$/i);
+      const match = line.match(/^(\d+)x?\s+(.+)$/i);
       const name = (match ? match[2] : line).trim();
       if (!name) return [];
       return [{
