@@ -1010,14 +1010,16 @@ export default function AdminTest() {
         const batchMap = await lookupCsvBatch(batch);
         batchMap.forEach((value, key) => found.set(key, value));
       }
-      setCsvRows(prev => prev.map(row => {
+      const updatedRows = rowsToProcess.map(row => {
         const card = found.get(row.name.toLowerCase());
         if (!card) return { ...row, status: 'notfound' };
         return {
           ...row, status: 'found', data: card, printings: [], printingsLoading: false,
           price: card.usd ? (parseFloat(card.usd) * pctFor(row.condition) / 100).toFixed(2) : ''
         };
-      }));
+      });
+      setCsvRows(updatedRows);
+      await autoLoadCsvPrintings(updatedRows);
     } catch (error) {
       setCsvRows(prev => prev.map(row => row.status === 'pending' || row.status === 'loading'
         ? { ...row, status: 'notfound' } : row));
@@ -1038,16 +1040,43 @@ export default function AdminTest() {
         const batchMap = await lookupCsvBatch(names.slice(start, start + 75));
         batchMap.forEach((value, key) => found.set(key, value));
       }
-      setCsvRows(prev => prev.map(row => {
+      const updatedRows = csvRows.map(row => {
         if (row.status !== 'notfound') return row;
         const card = found.get(row.name.toLowerCase());
-        return card ? { ...row, status: 'found', data: card,
+        return card ? { ...row, status: 'found', data: card, printings: [], printingsLoading: false,
           price: card.usd ? (parseFloat(card.usd) * pctFor(row.condition) / 100).toFixed(2) : '' } : row;
-      }));
+      });
+      setCsvRows(updatedRows);
+      await autoLoadCsvPrintings(updatedRows);
     } catch (error) {
       alert(error.message || 'Error al reintentar las cartas.');
     } finally {
       setImporting(false);
+    }
+  }
+
+  async function autoLoadCsvPrintings(rows) {
+    const cache = new Map();
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (row.status !== 'found' || !row.data?.name) continue;
+      const key = row.data.name.toLowerCase();
+      if (cache.has(key)) {
+        updateCsvRow(i, { printings: cache.get(key), printingsLoading: false });
+        continue;
+      }
+      updateCsvRow(i, { printingsLoading: true });
+      try {
+        const response = await fetch('/api/card-printings?name=' + encodeURIComponent(row.data.name));
+        const result = await response.json();
+        const printings = response.ok ? (result.printings || []) : [];
+        cache.set(key, printings);
+        updateCsvRow(i, { printings, printingsLoading: false, printingsError: response.ok ? '' : (result.error || 'No se pudieron cargar las ediciones.') });
+      } catch (error) {
+        updateCsvRow(i, { printings: [], printingsLoading: false, printingsError: error.message });
+      }
+      // Mantiene una separación conservadora entre consultas de ediciones.
+      if (i < rows.length - 1) await new Promise(resolve => setTimeout(resolve, 1200));
     }
   }
 
