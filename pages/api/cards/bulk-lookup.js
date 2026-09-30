@@ -15,12 +15,31 @@ export default async function handler(req, res) {
   const names = [...new Set(input.map(name => name.trim()))];
   const data = [];
   const not_found = [];
+  const requestTimes = [];
+
+  // Scryfall pide mantener la API por debajo de 10 solicitudes/segundo.
+  // Aquí usamos un límite mucho más conservador: máximo 9 solicitudes cada 10 segundos.
+  async function waitForScryfallSlot() {
+    while (requestTimes.length >= 9) {
+      const oldest = requestTimes[0];
+      const elapsed = Date.now() - oldest;
+      const waitMs = 10000 - elapsed;
+      if (waitMs > 0) await new Promise(resolve => setTimeout(resolve, waitMs));
+      requestTimes.shift();
+    }
+    requestTimes.push(Date.now());
+  }
+
+  async function scryfallFetch(url, options = {}) {
+    await waitForScryfallSlot();
+    return fetch(url, options);
+  }
 
   try {
-    // La colección exacta es eficiente; después se intenta fuzzy para los nombres no encontrados.
+    // La colección exacta es eficiente: hasta 75 nombres por petición.
     for (let i = 0; i < names.length; i += 75) {
       const batch = names.slice(i, i + 75);
-      const response = await fetch('https://api.scryfall.com/cards/collection', {
+      const response = await scryfallFetch('https://api.scryfall.com/cards/collection', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -45,19 +64,23 @@ export default async function handler(req, res) {
       }
     }
 
-    // Resuelve nombres aproximados con concurrencia limitada para no saturar Scryfall.
+    // Resuelve nombres aproximados con concurrencia limitada y el mismo
+    // limitador global de 9 solicitudes por cada ventana de 10 segundos.
     const unresolved = [...not_found];
     not_found.length = 0;
     for (let i = 0; i < unresolved.length; i += 5) {
       const group = unresolved.slice(i, i + 5);
       const results = await Promise.all(group.map(async requested => {
         try {
-          const response = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(requested)}`, {
-            headers: { 'User-Agent': 'BovedaArcana/1.0', Accept: 'application/json' }
-          });
+          const response = await scryfallFetch(
+            `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(requested)}`,
+            { headers: { 'User-Agent': 'BovedaArcana/1.0', Accept: 'application/json' } }
+          );
           if (!response.ok) return { requested, card: null };
           return { requested, card: await response.json() };
-        } catch { return { requested, card: null }; }
+        } catch {
+          return { requested, card: null };
+        }
       }));
       for (const result of results) {
         if (result.card && result.card.object !== 'error') {
@@ -65,6 +88,7 @@ export default async function handler(req, res) {
         } else not_found.push(result.requested);
       }
     }
+
     return res.status(200).json({ data, not_found });
   } catch (error) {
     return res.status(502).json({ error: error.message || 'Error al conectar con Scryfall.' });
