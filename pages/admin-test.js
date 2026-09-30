@@ -823,6 +823,7 @@ export default function AdminTest() {
   // ---------- Importar CSV ----------
   const [showImport, setShowImport] = useState(false);
   const [csvRows, setCsvRows] = useState([]);
+  const [csvPasteText, setCsvPasteText] = useState('');
   const [importing, setImporting] = useState(false);
 
   function parseCSV(text) {
@@ -848,6 +849,20 @@ export default function AdminTest() {
     return rows.filter(r => r.length && r.some(c => c.trim() !== ''));
   }
 
+  function parseImportRows(rows) {
+    const header = rows[0]?.map(c => c.trim().toLowerCase()) || [];
+    const nameIdx = header.findIndex(h => ['name', 'nombre', 'carta', 'card'].includes(h));
+    const qtyIdx = header.findIndex(h => ['qty', 'cantidad', 'cant'].includes(h));
+    const condIdx = header.findIndex(h => ['condition', 'condicion', 'condición', 'estado'].includes(h));
+    const dataRows = nameIdx !== -1 ? rows.slice(1) : rows;
+    return dataRows.map(r => ({
+      name: (nameIdx !== -1 ? r[nameIdx] : r[0]) || '',
+      qty: (qtyIdx !== -1 && r[qtyIdx] && parseInt(r[qtyIdx])) || 1,
+      condition: (condIdx !== -1 && r[condIdx]?.trim()) || 'Near Mint',
+      status: 'pending', data: null, price: '', include: true
+    })).map(r => ({ ...r, name: r.name.trim() })).filter(r => r.name);
+  }
+
   function handleCsvFile(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -855,20 +870,7 @@ export default function AdminTest() {
     reader.onload = () => {
       const rows = parseCSV(String(reader.result));
       if (rows.length === 0) { alert('El CSV está vacío.'); return; }
-      const header = rows[0].map(c => c.trim().toLowerCase());
-      const nameIdx = header.findIndex(h => ['name', 'nombre', 'carta', 'card'].includes(h));
-      const qtyIdx = header.findIndex(h => ['qty', 'cantidad', 'cant'].includes(h));
-      const condIdx = header.findIndex(h => ['condition', 'condicion', 'condición', 'estado'].includes(h));
-      const dataRows = nameIdx !== -1 ? rows.slice(1) : rows;
-      const parsed = dataRows
-        .map(r => ({
-          name: (nameIdx !== -1 ? r[nameIdx] : r[0]) || '',
-          qty: (qtyIdx !== -1 && r[qtyIdx] && parseInt(r[qtyIdx])) || 1,
-          condition: (condIdx !== -1 && r[condIdx] && r[condIdx].trim()) || 'Near Mint',
-          status: 'pending', data: null, price: '', include: true
-        }))
-        .map(r => ({ ...r, name: r.name.trim() }))
-        .filter(r => r.name);
+      const parsed = parseImportRows(rows);
       if (parsed.length === 0) { alert('No se encontraron nombres de cartas en el archivo.'); return; }
       setCsvRows(parsed);
       runImportLookups(parsed);
@@ -877,45 +879,82 @@ export default function AdminTest() {
     e.target.value = '';
   }
 
-  async function lookupWithTimeout(name, timeoutMs = 8000) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch('/api/card-lookup?name=' + encodeURIComponent(name), { signal: controller.signal });
-      const d = await res.json();
-      clearTimeout(timer);
-      if (!res.ok) return { ok: false };
-      return { ok: true, data: d };
-    } catch (e) {
-      clearTimeout(timer);
-      return { ok: false };
-    }
+  function processCsvPaste() {
+    const lines = csvPasteText.split(/\\r?\\n/).map(line => line.trim()).filter(Boolean);
+    const parsed = lines.map(line => {
+      const match = line.match(/^(\\d+)x?\\s+(.+)$/i);
+      return {
+        name: match ? match[2].trim() : line,
+        qty: match ? Math.max(1, parseInt(match[1], 10)) : 1,
+        condition: 'Near Mint', status: 'pending', data: null, price: '', include: true
+      };
+    }).filter(row => row.name);
+    if (!parsed.length) { alert('Pega al menos una carta, una por línea.'); return; }
+    setCsvRows(parsed);
+    runImportLookups(parsed);
+  }
+
+  async function lookupCsvBatch(names) {
+    const response = await fetch('/api/cards/bulk-lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cards: names })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Error al consultar Scryfall.');
+    return new Map((data.data || []).map(card => [card.name.toLowerCase(), card]));
   }
 
   async function runImportLookups(rowsToProcess) {
     setImporting(true);
-    for (let i = 0; i < rowsToProcess.length; i++) {
-      setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'loading' } : r));
-      const result = await lookupWithTimeout(rowsToProcess[i].name);
-      if (!result.ok) setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'notfound' } : r));
-      else setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'found', data: result.data, price: result.data.usd ? (parseFloat(result.data.usd) * pctFor(r.condition) / 100).toFixed(2) : '' } : r));
-      await new Promise(res => setTimeout(res, 120));
+    const allNames = [...new Set(rowsToProcess.map(row => row.name.trim()).filter(Boolean))];
+    const found = new Map();
+    try {
+      // Consultas en lotes de 75 para evitar una petición individual por carta.
+      for (let start = 0; start < allNames.length; start += 75) {
+        const batch = allNames.slice(start, start + 75);
+        const batchMap = await lookupCsvBatch(batch);
+        batchMap.forEach((value, key) => found.set(key, value));
+      }
+      setCsvRows(prev => prev.map(row => {
+        const card = found.get(row.name.toLowerCase());
+        if (!card) return { ...row, status: 'notfound' };
+        return {
+          ...row, status: 'found', data: card,
+          price: card.usd ? (parseFloat(card.usd) * pctFor(row.condition) / 100).toFixed(2) : ''
+        };
+      }));
+    } catch (error) {
+      setCsvRows(prev => prev.map(row => row.status === 'pending' || row.status === 'loading'
+        ? { ...row, status: 'notfound' } : row));
+      alert(error.message || 'Error al consultar las cartas.');
+    } finally {
+      setImporting(false);
     }
-    setImporting(false);
   }
 
   async function retryAllFailed() {
-    const failedIdx = csvRows.map((r, i) => ({ r, i })).filter(x => x.r.status === 'notfound').map(x => x.i);
-    if (failedIdx.length === 0) return;
+    const failed = csvRows.filter(row => row.status === 'notfound');
+    if (!failed.length) return;
     setImporting(true);
-    for (const i of failedIdx) {
-      setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'loading' } : r));
-      const result = await lookupWithTimeout(csvRows[i].name);
-      if (!result.ok) setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'notfound' } : r));
-      else setCsvRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'found', data: result.data, price: result.data.usd ? (parseFloat(result.data.usd) * pctFor(r.condition) / 100).toFixed(2) : '' } : r));
-      await new Promise(res => setTimeout(res, 120));
+    try {
+      const names = [...new Set(failed.map(row => row.name.trim()))];
+      const found = new Map();
+      for (let start = 0; start < names.length; start += 75) {
+        const batchMap = await lookupCsvBatch(names.slice(start, start + 75));
+        batchMap.forEach((value, key) => found.set(key, value));
+      }
+      setCsvRows(prev => prev.map(row => {
+        if (row.status !== 'notfound') return row;
+        const card = found.get(row.name.toLowerCase());
+        return card ? { ...row, status: 'found', data: card,
+          price: card.usd ? (parseFloat(card.usd) * pctFor(row.condition) / 100).toFixed(2) : '' } : row;
+      }));
+    } catch (error) {
+      alert(error.message || 'Error al reintentar las cartas.');
+    } finally {
+      setImporting(false);
     }
-    setImporting(false);
   }
 
   function updateCsvRow(i, patch) {
@@ -1069,6 +1108,13 @@ export default function AdminTest() {
             datos en Scryfall automáticamente — tú solo revisas y confirmas.
           </p>
           <input type="file" accept=".csv,text/csv" onChange={handleCsvFile} disabled={importing} />
+          <div className="field" style={{ marginTop: 12 }}>
+            <label>O pega una lista sin CSV (una carta por línea; admite cantidades, ej. 2 Sol Ring)</label>
+            <textarea value={csvPasteText} onChange={e => setCsvPasteText(e.target.value)} rows={5}
+              placeholder={'1 Sol Ring\\n2 Arcane Signet\\nCommand Tower'}
+              style={{ width: '100%', background: 'var(--ink2)', border: '1px solid var(--line)', color: 'var(--parchment)', borderRadius: 'var(--radius)', padding: '10px 12px', fontFamily: 'monospace' }} />
+            <button className="ghost" onClick={processCsvPaste} disabled={importing || !csvPasteText.trim()} style={{ marginTop: 8 }}>Procesar lista</button>
+          </div>
 
           {csvRows.length > 0 && (
             <div style={{ marginTop: 18 }}>
