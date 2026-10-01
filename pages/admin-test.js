@@ -940,11 +940,13 @@ export default function AdminTest() {
     const nameIdx = header.findIndex(h => ['name', 'nombre', 'carta', 'card', 'cardname', 'nombrecarta'].includes(h));
     const qtyIdx = header.findIndex(h => ['qty', 'quantity', 'cantidad', 'cant', 'count'].includes(h));
     const condIdx = header.findIndex(h => ['condition', 'condicion', 'estado', 'cardcondition'].includes(h));
+    const setIdx = header.findIndex(h => ['expansion', 'edicion', 'edition', 'set', 'setname', 'nombreexpansion'].includes(h));
     const dataRows = nameIdx !== -1 ? rows.slice(1) : rows;
     return dataRows.map(r => {
       const rawQty = qtyIdx !== -1 ? parseInt(r[qtyIdx], 10) : 1;
       return {
         name: (nameIdx !== -1 ? r[nameIdx] : r[0]) || '',
+        requestedSet: setIdx !== -1 ? String(r[setIdx] || '').trim() : '',
         qty: Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 1,
         condition: (condIdx !== -1 && r[condIdx]?.trim()) || 'Near Mint',
         status: 'pending', data: null, price: '', include: true
@@ -1072,6 +1074,12 @@ export default function AdminTest() {
         const printings = response.ok ? (result.printings || []) : [];
         cache.set(key, printings);
         updateCsvRow(i, { printings, printingsLoading: false, printingsError: response.ok ? '' : (result.error || 'No se pudieron cargar las ediciones.') });
+        if (row.requestedSet && printings.length) {
+          const normalizeSet = value => String(value || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim().toLowerCase();
+          const wanted = normalizeSet(row.requestedSet);
+          const match = printings.find(p => normalizeSet(p.set_name) === wanted || normalizeSet(p.set) === wanted);
+          if (match) selectCsvRowPrinting(i, match);
+        }
       } catch (error) {
         updateCsvRow(i, { printings: [], printingsLoading: false, printingsError: error.message });
       }
