@@ -3,6 +3,10 @@ import ThemeToggle from '../components/ThemeToggle';
 import PasswordInput from '../components/PasswordInput';
 
 const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '';
+
+function LoadingSpinner({ size = 14 }) {
+  return <span aria-label="Cargando" role="status" style={{ display: 'inline-block', width: size, height: size, border: '2px solid var(--line)', borderTopColor: 'var(--gold)', borderRadius: '50%', animation: 'ba-spin 0.75s linear infinite', verticalAlign: 'middle', flexShrink: 0 }} />;
+}
 const ADMIN_TABS = [
   ['inventory', 'INVENTARIO'], ['orders', 'PEDIDOS'], ['users', 'USUARIOS', true],
   ['stats', 'ESTADÍSTICAS', true], ['profit', 'RENTABILIDAD', true], ['pricing', 'PRECIOS', true],
@@ -1375,7 +1379,7 @@ export default function AdminTest() {
 
               <div style={{ display: 'flex', gap: 10, marginTop: 16, alignItems: 'center', flexWrap: 'wrap' }}>
                 <button className="primary" onClick={importSelected} disabled={importing}>
-                  {importing ? 'Procesando...' : `Agregar seleccionadas (${csvRows.filter(r => r.include && r.status === 'found').length})`}
+                  {importing ? <><LoadingSpinner /> Procesando...</> : `Agregar seleccionadas (${csvRows.filter(r => r.include && r.status === 'found').length})`}
                 </button>
                 {csvRows.some(r => r.status === 'notfound') && (
                   <button className="ghost" onClick={retryAllFailed} disabled={importing}>
@@ -1391,7 +1395,7 @@ export default function AdminTest() {
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
         <input placeholder="Buscar carta en Scryfall (ej. Sol Ring)" value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} />
-        <button className="primary" onClick={search} disabled={searching}>{searching ? 'Buscando...' : 'Buscar'}</button>
+        <button className="primary" onClick={search} disabled={searching}>{searching ? <><LoadingSpinner /> Buscando...</> : 'Buscar'}</button>
       </div>
 
       <button className="ghost" style={{ marginBottom: 16 }} onClick={() => setShowExact(v => !v)}>
@@ -1455,7 +1459,7 @@ export default function AdminTest() {
             {exColors.length > 0 && <button className="ghost" onClick={() => setExColors([])}>Limpiar</button>}
           </div>
 
-          <button className="primary" onClick={searchExact} disabled={searching}>{searching ? 'Buscando...' : 'Buscar exacto'}</button>
+          <button className="primary" onClick={searchExact} disabled={searching}>{searching ? <><LoadingSpinner /> Buscando...</> : 'Buscar exacto'}</button>
         </div>
       )}
 
@@ -1614,7 +1618,7 @@ export default function AdminTest() {
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 16, position: 'sticky', bottom: 12 }}>
             <button className="primary" onClick={saveAllRowEdits} disabled={dirtyCount === 0 || importing}>
-              {importing ? 'Guardando...' : `Guardar cambios (${dirtyCount})`}
+              {importing ? <><LoadingSpinner /> Guardando...</> : `Guardar cambios (${dirtyCount})`}
             </button>
           </div>
         </div>
@@ -2327,6 +2331,7 @@ export default function AdminTest() {
           </div>
         </div>
       )}
+      <style jsx global>{`@keyframes ba-spin { to { transform: rotate(360deg); } }`}</style>
     </main>
     </div>
   );
